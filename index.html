@@ -670,17 +670,21 @@ function save(immediate) {
 
 /* ================= 雲端同步（GitHub 私人 Gist） =================
    Token 與同步狀態放在另一個 key，不會跟著匯出 JSON，也不會上傳。
-   判斷「這台有沒有改過」用內容指紋（不含天氣快取），判斷「雲端有沒有被別台改過」用 savedAt。 */
+   判斷「這台有沒有改過」用內容指紋（不含天氣快取），判斷「雲端有沒有被別台改過」用 savedAt。
+   兩邊都改過時做三方合併：拿「上次同步時的內容」(base) 逐筆比對，只有同一個欄位兩邊都改才算衝突。 */
 const SYNC_KEY = "pda.v1.sync";
+const SYNC_BASE_KEY = "pda.v1.syncbase";   // 上次同步時雲端的內容，合併用
 const SYNC_FILE = "pda-data.json";
 const SYNC_DESC = "PDA 個人助理同步資料（自動產生，請勿手動修改）";
 let sync = loadSync();
 let syncTimer = null, syncBusy = false, syncAgain = false, syncLastPull = 0;
 function loadSync() {
-  try { return { token: "", gistId: "", remoteAt: null, hash: "", lastSync: 0, err: "", ...JSON.parse(localStorage.getItem(SYNC_KEY) || "{}") }; }
-  catch (e) { return { token: "", gistId: "", remoteAt: null, hash: "", lastSync: 0, err: "" }; }
+  try { return { token: "", gistId: "", remoteAt: null, hash: "", lastSync: 0, localAt: 0, err: "", ...JSON.parse(localStorage.getItem(SYNC_KEY) || "{}") }; }
+  catch (e) { return { token: "", gistId: "", remoteAt: null, hash: "", lastSync: 0, localAt: 0, err: "" }; }
 }
 function saveSync() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); } catch (e) {} }
+function loadBase() { try { return localStorage.getItem(SYNC_BASE_KEY) || ""; } catch (e) { return ""; } }
+function setBase(s) { try { s ? localStorage.setItem(SYNC_BASE_KEY, s) : localStorage.removeItem(SYNC_BASE_KEY); } catch (e) {} }
 // 同步內容：整份資料去掉天氣快取
 function syncBody(d) { const { cache, ...rest } = d; return JSON.stringify(rest); }
 function syncHash(d) {
@@ -691,10 +695,53 @@ function syncHash(d) {
 // 存檔後呼叫：內容真的變了才排程上傳（停手 5 秒）
 function syncSoon() {
   if (!sync.token || syncHash(db) === sync.hash) return;
+  sync.localAt = Date.now(); saveSync();   // 衝突時拿來比哪邊比較新
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => syncNow(), 5000);
   showSync();
 }
+
+/* ---- 三方合併 ----
+   b = 上次同步的內容，l = 這台，r = 雲端。只有一邊改過就用那邊的；
+   有 id 的清單逐筆合併（各自新增都保留、一邊刪一邊沒動就刪）；物件逐欄合併；
+   同一個欄位兩邊都改才算衝突，採用比較新的那邊（ctx.preferLocal）。 */
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const isObj = x => !!x && typeof x === "object" && !Array.isArray(x);
+const isIdList = x => Array.isArray(x) && x.every(i => isObj(i) && i.id != null);
+function merge3(b, l, r, ctx) {
+  if (same(l, r)) return l;
+  if (same(l, b)) return r;
+  if (same(r, b)) return l;
+  if (isIdList(l) && isIdList(r) && (b === undefined || isIdList(b))) return mergeList(b || [], l, r, ctx);
+  if (isObj(l) && isObj(r)) {
+    const bo = isObj(b) ? b : {}, out = {};
+    for (const k of new Set([...Object.keys(l), ...Object.keys(r)])) {
+      const v = merge3(bo[k], l[k], r[k], ctx);
+      if (v !== undefined) out[k] = v;
+    }
+    return out;
+  }
+  ctx.conflicts++;
+  return ctx.preferLocal ? l : r;
+}
+function mergeList(b, l, r, ctx) {
+  const B = new Map(b.map(x => [x.id, x])), L = new Map(l.map(x => [x.id, x])), R = new Map(r.map(x => [x.id, x]));
+  const pick = id => {
+    const bi = B.get(id), li = L.get(id), ri = R.get(id);
+    if (li && ri) return merge3(bi, li, ri, ctx);
+    if (!bi) return li || ri;                    // 只有一邊新增的
+    const other = li || ri;                      // 一邊刪掉了：另一邊沒動就刪，改過就保留
+    if (same(other, bi)) return undefined;
+    ctx.conflicts++;
+    return other;
+  };
+  // 以這台的順序為主，雲端新增的插在它在雲端的位置
+  const out = [];
+  for (const x of l) { const v = pick(x.id); if (v) out.push(v); }
+  r.forEach((x, i) => { if (!L.has(x.id)) { const v = pick(x.id); if (v) out.splice(Math.min(i, out.length), 0, v); } });
+  return out;
+}
+
 async function gh(path, opt = {}) {
   const r = await fetch("https://api.github.com" + path, {
     ...opt,
@@ -713,21 +760,33 @@ async function gistRead(g) {
 }
 async function gistWrite() {
   const savedAt = Date.now();
-  const content = JSON.stringify({ app: "pda", savedAt, db: JSON.parse(syncBody(db)) });
+  const str = syncBody(db);
+  // schema 讓舊版程式認得出「這是新版寫的」，不會拿舊格式蓋回去；
+  // editedAt 是資料最後被修改的時間（不是上傳時間），衝突時比這個
+  const editedAt = sync.localAt || savedAt;
+  const content = JSON.stringify({ app: "pda", schema: SCHEMA, savedAt, editedAt, db: JSON.parse(str) });
   const body = JSON.stringify({ description: SYNC_DESC, files: { [SYNC_FILE]: { content } } });
   const g = sync.gistId
     ? await gh("/gists/" + sync.gistId, { method: "PATCH", body })
     : await gh("/gists", { method: "POST", body: JSON.stringify({ ...JSON.parse(body), public: false }) });
   sync.gistId = g.id; sync.remoteAt = savedAt; sync.hash = syncHash(db);
+  setBase(str);
 }
-function applyRemote(remote) {
+// 換上新資料（天氣快取留本機的）
+function useData(d) {
   const cache = db.cache;
-  db = normalize(remote.db);
-  db.cache = cache;                      // 天氣快取留本機的
+  db = normalize(d);
+  db.cache = cache;
   if (state.memoSel && !db.memos.some(m => m.id === state.memoSel)) state.memoSel = null;
-  sync.remoteAt = remote.savedAt; sync.hash = syncHash(db);
   try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
   render();
+}
+function applyRemote(remote) {
+  const raw = JSON.stringify(remote.db);   // normalize 會改動物件，先留一份原樣當 base
+  useData(JSON.parse(raw));
+  sync.remoteAt = remote.savedAt; sync.hash = syncHash(db);
+  sync.localAt = remote.editedAt || remote.savedAt;   // 這台現在的內容就是雲端那份
+  setBase(raw);
 }
 // 拉一次、必要時推一次。manual = 使用者按的，失敗時跳訊息
 async function syncNow(manual) {
@@ -743,8 +802,11 @@ async function syncNow(manual) {
       if (hit) sync.gistId = hit.id;
     }
     const remote = sync.gistId ? await gistRead(await gh("/gists/" + sync.gistId)) : null;
+    if (remote && (remote.schema || 0) > SCHEMA)
+      throw new Error("雲端資料是較新版本的 PDA 寫的。請重新整理頁面更新程式（本機請改用最新的 pda.html），更新前先暫停同步，不會覆蓋雲端");
     const localChanged = syncHash(db) !== sync.hash;
     const remoteChanged = !!remote && remote.savedAt !== sync.remoteAt;
+    const base = loadBase();
 
     if (!remote) await gistWrite();                       // 雲端還沒有資料：上傳這台的
     else if (sync.remoteAt === null) {                    // 這台第一次連上已有資料的雲端
@@ -753,13 +815,24 @@ async function syncNow(manual) {
       } else if (confirm("確定要用這台的資料覆蓋雲端？\n（雲端舊資料仍可在 GitHub Gist 的 Revisions 找回）")) await gistWrite();
       else throw new Error("尚未同步：已取消");
     }
-    else if (remoteChanged && localChanged) {             // 兩邊都改過
+    else if (remoteChanged && localChanged && base) {     // 兩邊都改過：逐筆合併
+      const remoteEdited = remote.editedAt || remote.savedAt;
+      const ctx = { conflicts: 0, preferLocal: (sync.localAt || 0) > remoteEdited };
+      const merged = merge3(JSON.parse(base), JSON.parse(syncBody(db)), remote.db, ctx);
+      if (ctx.conflicts) snapshot("同步衝突");
+      useData(merged);
+      sync.localAt = Math.max(sync.localAt || 0, remoteEdited);   // 合併結果的修改時間取兩邊較新的
+      await gistWrite();
+      if (ctx.conflicts) { say(`同步時有 ${ctx.conflicts} 處兩邊都改過，已採用${ctx.preferLocal ? "這台" : "另一台"}比較新的版本。合併前的資料在「自動備份」。`); updateChara(); }
+    }
+    else if (remoteChanged && localChanged) {             // 舊版留下的狀態沒有 base，只能二選一
       if (confirm(`其他裝置在 ${new Date(remote.savedAt).toLocaleString("zh-TW")} 更新了雲端，這台也有還沒同步的修改。\n\n按「確定」：用雲端的（這台的修改會先自動備份）。\n按「取消」：用這台的覆蓋雲端（雲端舊資料可在 Gist 的 Revisions 找回）。`)) {
         snapshot("同步衝突"); applyRemote(remote);
       } else await gistWrite();
     }
     else if (remoteChanged) applyRemote(remote);
     else if (localChanged) await gistWrite();
+    else if (!base) setBase(JSON.stringify(remote.db));   // 從舊版升上來：兩邊一致，補上 base
 
     sync.lastSync = Date.now(); sync.err = ""; syncLastPull = Date.now();
   } catch (e) {
@@ -781,10 +854,10 @@ function showSync() {
   el.title = sync.err || (sync.lastSync ? "上次同步：" + new Date(sync.lastSync).toLocaleString("zh-TW") : "");
   el.classList.toggle("bad", !!sync.err);
 }
-// 切回這個分頁時拉一次（10 秒內不重複）；離開分頁時有待上傳的就立刻送
+// 切回這個分頁時拉一次（3 秒內不重複）；離開分頁時有待上傳的就立刻送
 document.addEventListener("visibilitychange", () => {
   if (!sync.token) return;
-  if (document.visibilityState === "visible" && Date.now() - syncLastPull > 10000) syncNow();
+  if (document.visibilityState === "visible" && Date.now() - syncLastPull > 3000) syncNow();
   if (document.visibilityState === "hidden" && syncHash(db) !== sync.hash) syncNow();
 });
 window.addEventListener("online", () => syncNow());
@@ -2441,14 +2514,14 @@ function wire() {
       case "syncOn": {
         const t = $("#syncToken").value.trim();
         if (!t) break;
-        sync = { ...loadSync(), token: t, gistId: "", remoteAt: null, hash: "", err: "" };
+        sync = { ...loadSync(), token: t, gistId: "", remoteAt: null, hash: "", err: "" }; setBase("");
         saveSync(); render(); syncNow(true);
         break;
       }
       case "syncNow": syncNow(true); break;
       case "syncOff":
         if (!confirm("中斷雲端同步？\n這台的資料會保留，雲端的 Gist 也不會刪除，之後貼上 Token 可以再連回來。")) break;
-        sync = { ...loadSync(), token: "", gistId: "", remoteAt: null, hash: "", err: "" };
+        sync = { ...loadSync(), token: "", gistId: "", remoteAt: null, hash: "", err: "" }; setBase("");
         saveSync(); showSync(); render();
         break;
       case "exportMd": download("pda-" + TODAY() + ".md", toMarkdown(), "text/markdown"); break;
@@ -2670,6 +2743,18 @@ fetchWeather();
 setInterval(() => fetchWeather(), 30 * 60 * 1000);
 // 放在 https 網址（GitHub Pages）時註冊離線快取；本機 file:// 不需要
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+// 網頁版：切回分頁時看看程式有沒有更新，有就自動重新整理（正在打字時不打斷，等下次）
+if (location.protocol === "https:") {
+  let verText = null, verLast = 0;
+  const verGet = () => fetch(location.pathname, { cache: "no-store" }).then(r => r.ok ? r.text() : null).catch(() => null);
+  verGet().then(t => { verText = t; });
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible" || !verText || Date.now() - verLast < 30000) return;
+    verLast = Date.now();
+    const t = await verGet(), a = document.activeElement;
+    if (t && t !== verText && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) location.reload();
+  });
+}
 </script>
 </body>
 </html>
