@@ -1,0 +1,2675 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDA · 個人助理</title>
+<!-- 手機「加到主畫面」用；本機直接開 pda.html 時找不到這些檔案也不影響 -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#0a0c0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="PDA">
+<style>
+/* ===== 主題 ===== */
+.app[data-theme="green"]{
+  --bg:#0a0c0b; --panel:#101413; --card:#151918; --chip:#1a201e;
+  --line:#242b28; --fg:#e6eae8; --dim:#8a938f;
+  --accent:#2ee66b; --accent2:#1f9d52; --danger:#ef5350;
+}
+.app[data-theme="amber"]{
+  --bg:#0d0a05; --panel:#15110a; --card:#1b1610; --chip:#211b12;
+  --line:#2f2617; --fg:#f0e4d2; --dim:#9c8b6d;
+  --accent:#ffb03a; --accent2:#c97f16; --danger:#ff7a5c;
+}
+.app[data-theme="blue"]{
+  --bg:#070b11; --panel:#0c1119; --card:#111823; --chip:#141d29;
+  --line:#1e2a3a; --fg:#dce6f2; --dim:#7d8fa3;
+  --accent:#4db8ff; --accent2:#1f86cc; --danger:#ef5350;
+}
+.app[data-theme="paper"]{
+  --bg:#eeece5; --panel:#f6f4ee; --card:#ffffff; --chip:#f0eee7;
+  --line:#dcd8cd; --fg:#2c2a26; --dim:#7a766c;
+  --accent:#1f8a4c; --accent2:#2f8f63; --danger:#b23b2e;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:#070a09;
+  font-family:"Noto Sans TC","Microsoft JhengHei",-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;
+}
+.mono{font-family:"Cascadia Mono",Consolas,ui-monospace,monospace}
+.app{background:var(--bg); color:var(--fg); min-height:100vh}
+
+/* ===== 三欄骨架 ===== */
+.shell{display:flex; width:100%; max-width:1720px; margin:0 auto; align-items:flex-start}
+
+/* 左：導航側欄 */
+.nav{
+  flex:0 0 232px; align-self:stretch; background:var(--panel);
+  border-right:1px solid var(--line); position:sticky; top:0; height:100vh;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.nav-brand{padding:18px 18px 14px}
+.nav-brand b{font-size:19px; letter-spacing:.16em; color:var(--accent); display:block}
+.nav-brand span{font-size:9.5px; letter-spacing:.22em; color:var(--dim)}
+.nav-list{flex:0 0 auto; padding:4px 10px; overflow-y:auto}
+.nav-list button{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  background:transparent; border:none; color:var(--dim); font:inherit; font-size:13.5px;
+  padding:10px 12px; border-radius:8px; cursor:pointer; margin-bottom:2px;
+}
+.nav-list button:hover{background:var(--chip); color:var(--fg)}
+.nav-list button.on{background:var(--chip); color:var(--fg)}
+.nav-list button.on .ic{color:var(--accent)}
+.nav-list .ic{width:17px; text-align:center; color:var(--dim); font-size:14px; flex:0 0 auto}
+.nav-list .badge{
+  margin-left:auto; font-size:10px; background:var(--accent2); color:var(--panel);
+  border-radius:9px; padding:1px 6px; font-weight:700;
+}
+/* 側欄下半：立繪與 NAVI */
+.nav-foot{margin-top:auto; padding:12px; display:flex; flex-direction:column; gap:10px; min-height:0}
+.chara-fig{
+  flex:1 1 auto; min-height:120px; border:1px solid var(--line); border-radius:10px;
+  overflow:hidden; background:var(--card); position:relative;
+}
+.chara-fig img{width:100%; height:100%; object-fit:cover; object-position:center top; display:block}
+.chara-fig svg{width:100%; height:100%; color:var(--accent); opacity:.4}
+.bubble{
+  flex:0 0 auto; position:relative; border:1px solid var(--line); border-radius:10px;
+  background:var(--card); padding:10px 12px 16px;
+}
+.bubble .who{font-size:9.5px; letter-spacing:.24em; color:var(--accent); margin-bottom:5px}
+.bubble .say{font-size:12px; line-height:1.75; min-height:38px}
+.bubble .next{position:absolute; right:10px; bottom:5px; font-size:10px; color:var(--accent); animation:blink 1.1s steps(2,start) infinite}
+.bubble.more{cursor:pointer}
+.bubble:not(.more) .next{display:none}
+.nav-foot.hide{display:none}
+/* 視窗太矮時收起立繪，把空間留給 NAVI 對話框 */
+@media(max-height:720px){ .chara-fig{display:none} }
+@keyframes blink{50%{opacity:0}}
+
+/* 中：內容區 */
+.content{flex:1; min-width:0; padding:20px 26px 48px}
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding-bottom:16px; color:var(--dim); font-size:11px; letter-spacing:.2em;
+}
+.topbar b{color:var(--fg); letter-spacing:.24em}
+.saved{color:var(--accent); opacity:0; transition:opacity .25s; letter-spacing:0}
+.saved.on{opacity:1}
+.sync-st{letter-spacing:0; color:var(--dim)}
+.sync-st.bad{color:var(--danger)}
+
+/* 右：資訊欄 */
+.rail{
+  flex:0 0 300px; align-self:stretch; padding:20px 20px 48px 0;
+  display:flex; flex-direction:column; gap:14px;
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+}
+.rail.hide{display:none}
+
+/* ===== 響應式三段式 =====
+   ≥1400  三欄
+   1100–1399 兩欄：右欄收起，天氣卡移到首頁最上方
+   <1100  單欄：側欄轉為頂部列，立繪降為半透明背景襯底 */
+.wx-home{display:none}
+@media(max-width:1399px){
+  .rail{display:none}
+  .wx-home{display:block}
+}
+@media(max-width:1099px){
+  .shell{flex-direction:column; max-width:100%; align-items:stretch}
+  .nav{
+    flex:0 0 auto; width:100%; height:auto; position:sticky; top:0; z-index:20;
+    border-right:none; border-bottom:1px solid var(--line); flex-direction:row;
+    align-items:center; gap:10px; padding:0 10px;
+  }
+  .nav-brand{padding:10px 6px; flex:0 0 auto}
+  .nav-brand span{display:none}
+  .nav-list{display:flex; gap:4px; padding:6px 0; overflow-x:auto; flex:1}
+  .nav-list button{width:auto; white-space:nowrap; padding:8px 11px}
+  .nav-list .ic{display:none}
+  .nav-foot{display:none}
+  .content{padding:16px 14px 40px}
+  .chara-bg{display:block}
+}
+/* 窄螢幕的立繪背景襯底 */
+.chara-bg{
+  display:none; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-size:cover; background-position:center top; opacity:.09;
+}
+.shell{position:relative; z-index:1}
+
+/* ===== 通用元件 ===== */
+h2{margin:0 0 4px; font-size:22px; font-weight:700; letter-spacing:.02em}
+h2 .jp{font-size:10px; color:var(--dim); letter-spacing:.3em; margin-left:10px; font-weight:400}
+h3{margin:22px 0 10px; font-size:13px; color:var(--dim); letter-spacing:.1em; font-weight:600}
+.sub-line{color:var(--dim); font-size:12px; margin-bottom:18px}
+a{color:var(--accent)} a:hover{color:var(--accent2)}
+
+input,textarea,select,button{font:inherit}
+input[type=text],input[type=date],input[type=time],input[type=search],input[type=password],textarea,select{
+  background:var(--chip); color:var(--fg); border:1px solid var(--line);
+  border-radius:8px; padding:8px 10px; width:100%; outline:none;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--accent2)}
+textarea{resize:vertical; line-height:1.7}
+.btn{
+  background:var(--card); color:var(--fg); border:1px solid var(--line);
+  border-radius:8px; padding:8px 14px; cursor:pointer; white-space:nowrap; font-size:13px;
+}
+.btn:hover{border-color:var(--accent2); color:var(--accent)}
+.btn.pri{background:var(--accent2); border-color:var(--accent2); color:#04140b; font-weight:700}
+.btn.pri:hover{background:var(--accent); color:#04140b}
+.btn.danger:hover{border-color:var(--danger); color:var(--danger)}
+.btn.sm{padding:5px 10px; font-size:12px}
+.row{display:flex; gap:8px; align-items:center}
+.row.wrap{flex-wrap:wrap}
+.grow{flex:1; min-width:0}
+/* 會換行的列裡，輸入框寧可換到下一行也不要被擠到只剩一個字寬 */
+.row.wrap > .grow{min-width:min(100%, 180px)}
+.muted{color:var(--dim); font-size:12px}
+.empty{color:var(--dim); text-align:center; padding:40px 12px; font-size:13px; line-height:2}
+
+.card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+.card-h{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px}
+.card-h .t{font-size:14px; font-weight:600}
+.card-h .more{font-size:12px; color:var(--accent); cursor:pointer}
+.grid{display:grid; gap:12px}
+.grid.c2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.grid.c3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.big{font-size:28px; font-weight:700; line-height:1.15}
+
+/* 統計卡 */
+.stat{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:13px 15px}
+.stat .k{font-size:12px; color:var(--dim); margin-bottom:6px}
+.stat .v{font-size:26px; font-weight:700; line-height:1.1}
+.stat .n{font-size:11px; color:var(--dim); margin-top:5px}
+.stat.ok .v{color:var(--accent)}
+.stat.bad .v{color:var(--danger)}
+
+/* 清單項 */
+.item{display:flex; gap:10px; align-items:flex-start; padding:9px 2px; border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:none}
+.item .body{flex:1; min-width:0}
+.item .title{font-size:13px; line-height:1.55; word-break:break-word}
+.item .sub{font-size:11px; color:var(--dim); margin-top:3px; word-break:break-all}
+.item.done .title{text-decoration:line-through; color:var(--dim)}
+.tick{
+  width:17px; height:17px; flex:0 0 auto; margin-top:2px; cursor:pointer; padding:0;
+  border:1px solid var(--dim); border-radius:5px; display:grid; place-items:center;
+  font-size:11px; color:#04140b; background:transparent;
+}
+.tick.on{background:var(--accent); border-color:var(--accent)}
+.chip{
+  display:inline-block; font-size:11.5px; padding:4px 10px; border-radius:20px;
+  border:1px solid var(--line); color:var(--dim); cursor:pointer; background:var(--card);
+}
+.chip.on{color:var(--accent); border-color:var(--accent2); background:var(--chip)}
+.memo-tags{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px}
+.memo-meta{margin-top:8px; display:flex; flex-direction:column; gap:6px}
+.memo-meta-row{display:flex; flex-wrap:wrap; align-items:center; gap:6px}
+.memo-meta-row > .muted{font-size:11.5px; min-width:64px}
+.chip.back{border-style:dashed; color:var(--dim); background:transparent}
+.chip.back:hover{color:var(--fg)}
+.chip.sm{font-size:11px; padding:2px 8px}
+.md-bar{display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-bottom:8px}
+.md-sep{width:1px; height:18px; background:var(--line); margin:0 3px}
+#memoBody.big, .md-view.big{font-size:17px; line-height:1.95}
+.md-view{
+  border:1px solid var(--line); border-radius:8px; background:var(--card);
+  padding:14px 16px; min-height:360px; line-height:1.75; font-size:14px; overflow-wrap:anywhere;
+}
+.md-view .md-gap{height:.7em}
+.md-view .md-h1{font-size:1.4em; font-weight:700; margin:.3em 0}
+.md-view .md-h2{font-size:1.2em; font-weight:700; color:var(--accent); margin:.3em 0}
+.md-view .md-h3{font-size:1.05em; font-weight:700; margin:.2em 0}
+.md-view .md-li{display:flex; gap:8px}
+.md-view .md-mk{color:var(--accent); flex:0 0 auto; min-width:1em}
+.md-view .md-src{color:var(--dim); font-size:.9em; border-left:3px solid var(--accent2); padding-left:8px}
+.md-view .md-rel{display:flex; flex-wrap:wrap; align-items:center; gap:6px}
+.md-view .md-rel .muted{font-size:.85em}
+.md-view a{color:var(--accent)}
+.md-view b{color:var(--fg)}
+.tag{
+  display:inline-block; font-size:10px; color:var(--dim); background:var(--chip);
+  border:1px solid var(--line); border-radius:5px; padding:1px 6px; margin-right:6px;
+}
+.overdue{color:var(--danger)}
+.dot-p{width:7px; height:7px; border-radius:50%; flex:0 0 auto}
+
+/* 進度條 */
+.bar{height:5px; background:var(--chip); border-radius:3px; overflow:hidden; margin-top:7px}
+.bar i{display:block; height:100%; background:var(--accent); transition:width .25s}
+
+/* 時間軸（近期行程） */
+.tl{position:relative; padding-left:18px}
+.tl::before{content:""; position:absolute; left:4px; top:4px; bottom:4px; width:2px; background:var(--line)}
+.tl-i{position:relative; padding:0 0 16px}
+.tl-i:last-child{padding-bottom:0}
+.tl-i::before{
+  content:""; position:absolute; left:-18px; top:5px; width:9px; height:9px;
+  border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--card);
+}
+.tl-i.late::before{background:var(--danger)}
+.tl-i.soon::before{background:var(--accent2)}
+.tl-i .t{font-size:13px; line-height:1.5}
+.tl-i .d{font-size:11px; color:var(--dim); margin-top:2px}
+
+/* ===== 備忘錄 ===== */
+.split{display:grid; grid-template-columns:260px 1fr; gap:14px}
+@media(max-width:860px){ .split{grid-template-columns:1fr} }
+.list{overflow:auto; max-height:560px}
+.list .item{cursor:pointer; padding:9px 10px; border:1px solid transparent; border-radius:8px; border-bottom:1px solid var(--line)}
+.list .item.sel{border-color:var(--accent2); background:var(--chip)}
+
+/* ===== 行事曆 ===== */
+.cal{display:grid; grid-template-columns:repeat(7,1fr); gap:5px}
+/* 行事曆：左月曆、右當天行程；窄螢幕改上下 */
+.cal-wrap{display:grid; grid-template-columns:minmax(0,3fr) minmax(300px,2fr); gap:14px; align-items:start; margin-bottom:6px}
+@media(max-width:900px){ .cal-wrap{grid-template-columns:1fr} }
+.cal-wrap .cal .day{min-height:54px}
+.cal .dow{text-align:center; font-size:11px; color:var(--dim); padding:4px 0}
+.cal .day{
+  min-height:64px; border:1px solid var(--line); border-radius:8px; background:var(--card);
+  padding:6px; cursor:pointer; display:flex; flex-direction:column; gap:4px; font-size:12px;
+}
+.cal .day:hover{border-color:var(--accent2)}
+.cal .day.out{opacity:.3}
+.cal .day.today{border-color:var(--accent)}
+.cal .day.sel{background:var(--chip); border-color:var(--accent)}
+.cal .day .n{color:var(--fg)}
+.cal .day.today .n{color:var(--accent); font-weight:700}
+.dots{display:flex; gap:3px; flex-wrap:wrap}
+.dot{width:5px; height:5px; border-radius:50%; background:var(--accent2)}
+.dot.tr{background:transparent; border:1px solid var(--accent)}
+.dot.tr.ok{background:var(--accent); border-color:var(--accent)}
+.dot.hb{background:transparent; border:1px solid var(--accent); border-radius:1px}
+.dot.hb.ok{background:var(--accent)}
+
+/* ===== 技能樹 ===== */
+.sk-scroll{overflow-x:auto; padding-bottom:6px; width:0; min-width:100%}
+/* 每個分類一欄，放不下就換到下一排；連線畫在底下的 SVG */
+.sk-wrap{position:relative; display:flex; flex-wrap:wrap; gap:34px 40px; align-items:flex-start}
+.sk-col{display:flex; flex-direction:column; gap:30px}
+.sk-tier-row{display:flex; align-items:center; gap:8px; min-height:20px}
+.sk-lines{position:absolute; left:0; top:0; pointer-events:none; z-index:0}
+.sk-head{position:relative; z-index:1; border-bottom:1px solid var(--line); padding-bottom:6px; font-size:12.5px}
+.sk-head .muted{font-size:10.5px; margin-left:6px}
+.sk-tlbl{position:relative; z-index:1; font-size:9.5px; color:var(--dim); letter-spacing:.1em; width:18px; flex:0 0 auto}
+.sk-cell{position:relative; z-index:1; display:flex; gap:12px}
+.sk-more{font-size:11px; cursor:pointer; padding-left:26px; margin-top:-14px}
+.sk-more:hover{color:var(--accent)}
+.sk-node{
+  width:148px; border:1px solid var(--line); border-radius:10px; background:var(--card);
+  padding:10px 11px; cursor:pointer; transition:border-color .15s, transform .1s;
+}
+.sk-node:hover{transform:translateY(-1px)}
+.sk-node.locked{opacity:.34; cursor:not-allowed}
+.sk-node.ready{border-color:var(--accent2)}
+.sk-node.learning{border-color:var(--accent)}
+.sk-node.master{border-color:var(--accent); background:var(--chip)}
+.sk-node.sel{box-shadow:0 0 0 2px var(--accent2)}
+.sk-cat{font-size:9.5px; color:var(--accent2); letter-spacing:.12em}
+.sk-name{font-size:12.5px; line-height:1.45; margin:4px 0 6px; word-break:break-word}
+.sk-lv{font-size:10.5px; color:var(--dim); display:flex; justify-content:space-between; gap:6px}
+.sk-lv b{color:var(--accent); font-weight:600}
+.sk-bar{height:3px; background:var(--chip); border-radius:2px; margin-top:6px; overflow:hidden}
+.sk-bar i{display:block; height:100%; background:var(--accent2); transition:width .25s}
+.sk-detail{border:1px solid var(--accent2); border-radius:12px; background:var(--card); padding:14px 16px; margin-top:6px}
+.sk-desc{
+  white-space:pre-line; font-size:12.5px; line-height:1.9; color:var(--fg);
+  border-left:2px solid var(--accent2); padding:2px 0 2px 11px; margin:8px 0;
+}
+.sk-stat{display:flex; gap:18px; flex-wrap:wrap; font-size:11.5px; color:var(--dim); margin-bottom:14px}
+.sk-stat b{color:var(--accent); font-size:16px; font-weight:700}
+
+/* ===== 天氣 ===== */
+.wx-head{font-size:12.5px; font-weight:600; color:var(--accent); margin-bottom:10px}
+.wx-place{font-size:13px; line-height:1.5; word-break:break-word}
+.wx-addr{font-size:11px; color:var(--dim); margin-top:4px; line-height:1.65}
+.wx-now{display:flex; align-items:baseline; gap:10px; margin:12px 0 6px}
+.wx-temp{font-size:34px; font-weight:700; line-height:1}
+.wx-desc{font-size:13px; color:var(--dim)}
+.wx-meta{font-size:11.5px; color:var(--dim); line-height:1.95}
+.wx-day{
+  display:grid; grid-template-columns:40px 1fr auto; gap:8px; align-items:center;
+  font-size:11.5px; padding:7px 0; border-top:1px solid var(--line);
+}
+.wx-day .d{color:var(--dim)}
+.wx-day .t{white-space:nowrap}
+.wx-day .lo{color:var(--dim)}
+.wx-rain{font-size:10px; color:var(--accent2)}
+.wx-err{font-size:11.5px; color:var(--danger); line-height:1.7}
+.geo-hit{cursor:pointer}
+
+
+/* ===== 設定頁 ===== */
+.set-wrap{display:flex; flex-direction:column; gap:14px}
+.set-row{
+  display:grid; grid-template-columns:170px 1fr; gap:16px; align-items:start;
+  padding:13px 0; border-bottom:1px solid var(--line);
+}
+.set-row:last-of-type{border-bottom:none; padding-bottom:2px}
+.set-row .lbl{font-size:13px; padding-top:5px}
+.set-row .lbl .hint{font-size:11px; color:var(--dim); margin-top:3px; line-height:1.5}
+.set-row .ctl{min-width:0}
+.set-note{
+  font-size:11.5px; color:var(--dim); line-height:1.9; margin-top:12px;
+  border-top:1px solid var(--line); padding-top:10px;
+}
+.set-note b{color:var(--fg); font-weight:600}
+code{background:var(--chip); padding:1px 5px; border-radius:4px; font-size:12px}
+@media(max-width:700px){ .set-row{grid-template-columns:1fr; gap:8px} }
+
+/* ===== 開機序列 ===== */
+#boot{
+  position:fixed; inset:0; z-index:99; background:#050807; color:#2ee66b; cursor:pointer;
+  padding:10vh 8vw; font-size:13px; line-height:2.1; white-space:pre-wrap;
+  font-family:"Cascadia Mono",Consolas,ui-monospace,monospace;
+}
+#boot.off{display:none}
+
+/* ===== 響應式覆寫：放在最後，才蓋得過上面各元件的預設 ===== */
+/* 首頁統計卡：寬螢幕 5 張排一列 */
+@media(min-width:1100px){ .grid.c3{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))} }
+/* ===== 手機與觸控 ===== */
+@media(max-width:1099px){
+  /* iPhone 輸入框字級小於 16px 時，點下去會自動放大畫面 */
+  input[type=text],input[type=date],input[type=time],input[type=search],input[type=password],textarea,select{font-size:16px}
+  /* 觸控目標放大 */
+  .btn{padding:10px 16px}
+  .btn.sm{padding:8px 12px; font-size:13px}
+  .chip{padding:7px 13px; font-size:12.5px}
+  .tick{width:24px; height:24px; margin-top:0; font-size:14px; position:relative}
+  .tick::after{content:""; position:absolute; inset:-10px}   /* 看起來 24px，實際可點 44px */
+  .item{padding:12px 2px; align-items:center}
+  /* 頂端列：品牌已經在分頁列上，這裡只留時鐘與同步狀態 */
+  .topbar > span:first-child{display:none}
+  .topbar{justify-content:flex-end; padding-bottom:10px}
+  /* 首頁統計卡兩欄，單數最後一張佔滿 */
+  .grid.c3{grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px}
+  .grid.c3 > :last-child:nth-child(odd){grid-column:span 2}
+  .stat{padding:11px 13px}
+  .stat .v{font-size:22px}
+}
+@media(max-width:600px){
+  /* 表單裡的主要輸入框獨佔一行，日期、選單、按鈕排在下面 */
+  .row.wrap > .grow{flex-basis:100%}
+}
+</style>
+</head>
+<body>
+<div id="boot" class="off"></div>
+<div class="app" id="app" data-theme="green">
+ <div class="chara-bg" id="charaBg"></div>
+ <div class="shell">
+
+  <aside class="nav">
+    <div class="nav-brand"><b>PDA</b><span>PERSONAL ASSISTANT</span></div>
+    <nav class="nav-list" id="tabs"></nav>
+    <div class="nav-foot" id="charaSide">
+      <div class="chara-fig">
+        <img id="charaImg" src="個人助理.jpg" alt=""
+             onerror="this.style.display='none';document.getElementById('charaPh').style.display='block'">
+        <svg id="charaPh" viewBox="0 0 100 128" preserveAspectRatio="xMidYMax meet" style="display:none">
+          <g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M34 46c0-11 7-19 16-19s16 8 16 19c0 12-7 21-16 21s-16-9-16-21z"/>
+            <path d="M32 44c0-14 8-23 18-23s18 9 18 23c-3-6-8-9-13-9-6 0-9 4-11 8-2-4-6-6-12 1z"/>
+            <path d="M41 49v4M59 49v4"/>
+            <path d="M22 128c0-18 8-28 28-28s28 10 28 28"/>
+          </g>
+        </svg>
+      </div>
+      <div class="bubble">
+        <div class="who">NAVI</div>
+        <div class="say" id="say"></div>
+        <div class="next">▼</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <span><b>PDA</b> PERSONAL ASSISTANT</span>
+      <span class="row" style="gap:14px">
+        <span class="saved" id="saved">● 已儲存</span>
+        <span class="sync-st" id="syncSt"></span>
+        <span class="mono" id="clock">--:--:--</span>
+      </span>
+    </div>
+    <div id="view"></div>
+  </div>
+
+  <aside class="rail" id="infoSide">
+    <div class="card wx-box" id="wx"></div>
+    <div class="card" id="railTrain"></div>
+    <div class="card" id="railSkill"></div>
+  </aside>
+
+ </div>
+</div>
+<script>
+"use strict";
+
+/* ================= 基礎工具 ================= */
+const KEY = "pda.v1";
+// 覆蓋資料前的自動備份（匯入、清除、還原），最多留 3 份，放在另一個 key，不會被匯入蓋掉
+const SNAP_KEY = "pda.v1.snapshots";
+const SNAP_MAX = 3;
+function loadSnaps() {
+  try { const a = JSON.parse(localStorage.getItem(SNAP_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+// 存一份目前資料；localStorage 存不下時退而求其次，下載一份到硬碟。回傳 false 代表兩者都失敗
+function snapshot(reason) {
+  const data = JSON.stringify(db);
+  try {
+    const list = [{ at: Date.now(), reason, data }, ...loadSnaps()].slice(0, SNAP_MAX);
+    localStorage.setItem(SNAP_KEY, JSON.stringify(list));
+    return true;
+  } catch (e) {
+    try { download(`pda-${reason}備份-${TODAY()}.json`, data, "application/json"); return true; }
+    catch (e2) { return false; }
+  }
+}
+const DEFAULT_AVATAR = "個人助理.jpg";
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const pad = n => String(n).padStart(2, "0");
+const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const TODAY = () => iso(new Date());
+const WD = ["日", "一", "二", "三", "四", "五", "六"];
+
+function fmtDate(s) {
+  if (!s) return "";
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `${m}/${d}（${WD[dt.getDay()]}）`;
+}
+function daysFromToday(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  const a = new Date(y, m - 1, d), b = new Date();
+  b.setHours(0, 0, 0, 0);
+  return Math.round((a - b) / 86400000);
+}
+
+/* ================= 種子資料 ================= */
+// 新裝置第一次打開時的預設連結（公開版不放個人連結；自己的連結靠匯入或雲端同步帶過來）
+const SEED_LINKS = [];
+
+// 技能樹種子：對應實際的學習路線
+// [id, 名稱, 分類, 階層, 前置[], 最大等級, 說明]
+const SEED_SKILLS = [
+  ["f_env", "整理專注環境", "專注力", 0, [], 3,
+    "桌上只留這次要用的東西、手機放到看不到的地方、關掉不必要的通知。\n環境先整理好，就不用一直靠意志力抵抗分心。"],
+  ["f_start", "一坐下就開始", "專注力", 0, [], 3,
+    "前一天就決定好明天的第一件事；坐下後先做 5 分鐘，不等狀態來。\n開始最難，把「要不要做」的猶豫拿掉。"],
+  ["f_todo", "待辦清單", "專注力", 1, ["f_start"], 4,
+    "每天早上列清單，每一項寫成看了就知道要做什麼的具體動作，做完打勾。\n直接用 PDA 的「待辦」練，關聯到這個技能完成就會加 XP。"],
+  ["f_block", "專注時段", "專注力", 1, ["f_env"], 4,
+    "用計時器切出一段只做一件事的時間（例如 25 分鐘＋休息 5 分鐘）。\n到「行事曆 → 排程」把固定的專注時段排進去。"],
+  ["f_morning", "善用早上", "專注力", 2, ["f_todo", "f_block"], 4,
+    "把最需要動腦的事放在剛起床、精神最好的那幾個小時。\n雜事、回訊息留到下午。"],
+  ["f_deep", "長時間專注", "專注力", 3, ["f_morning"], 5,
+    "能連續專心 60～90 分鐘不被打斷，做完一整塊有份量的工作。\n前面幾個技能都穩了，這個自然會出現。"],
+
+  ["r_habit", "每天讀一點", "閱讀", 0, [], 4,
+    "固定時段讀 15 分鐘就好，重點是天天讀而不是一次讀很多。\n可以排成「行事曆 → 日常行動」，讀完打勾。"],
+  ["r_note", "寫知識筆記", "閱讀", 0, [], 5,
+    "問句標題、出處（含頁碼）、用自己的話寫答案、寫下我要怎麼用。\n在 PDA「知識庫」練，每寫一則就算一次練習。"],
+  ["r_link", "連結筆記", "閱讀", 1, ["r_note"], 3,
+    "用「相關：」把筆記串起來，每本書有一頁書本頁當目錄。\n連結越多，越容易從一個想法找到另一個。"],
+  ["r_apply", "讀完就用", "閱讀", 1, ["r_habit", "r_note"], 4,
+    "每本書至少挑一個「我要怎麼用」，排成日常行動真的去做。\n用過才算學會。"],
+  ["r_review", "定期複習", "閱讀", 2, ["r_link"], 4,
+    "每週挑幾則舊筆記，先看標題回想，再打開對答案、補上新的想法。\n讓筆記從「寫過」變成「記得」。"],
+  ["r_output", "說給別人聽", "閱讀", 3, ["r_review", "r_apply"], 3,
+    "用自己的話把一本書的重點講給別人聽，或寫成一篇心得。\n講得出來，才是真的懂了。"],
+
+  ["h_sleep", "睡眠", "健康", 0, [], 5,
+    "固定上床與起床時間、睡前一小時不滑手機、睡滿 7 小時。\n睡眠是專注力的地基，睡不好其他都很難練。"],
+  ["h_move", "運動", "健康", 0, [], 5,
+    "從每天走路 20 分鐘開始，慢慢加上會流汗的有氧與簡單肌力。\n排成日常行動，做完打勾。"],
+  ["h_eat", "飲食", "健康", 1, [], 4,
+    "多喝水、三餐大致定時、少喝含糖飲料、吃飯不配手機。\n一次只改一個小習慣。"],
+  ["h_routine", "晨間例行", "健康", 1, ["h_sleep", "h_move"], 3,
+    "起床後喝水、照到陽光、簡單伸展，用固定的流程開機。\n跟專注力的「善用早上」互相加分。"],
+  ["h_rest", "放鬆與恢復", "健康", 2, ["h_sleep"], 4,
+    "累了先休息：深呼吸、散步、留一段什麼都不做的時間。\n會休息的人才能長期專注。"],
+  ["h_habit", "健康生活成形", "健康", 3, ["h_routine", "h_eat", "h_rest"], 3,
+    "睡眠、運動、飲食連續 4 週大致照表做到。\n不求完美，求不中斷。"]
+];
+
+// 資料架構版本：改了資料形狀就 +1，並在 MIGRATIONS 加一步，舊資料讀取／匯入時會逐版升級
+const SCHEMA = 3;
+const MIGRATIONS = {
+  // v2：筆記分成「備忘錄」與「知識庫」。有「出處：」或「相關：」的舊筆記歸到知識庫
+  2: d => d.memos.forEach(m => { m.kb = /^\s*(出處|相關)\s*[:：]/m.test(m.body || ""); }),
+  // v3：技能樹換成專注力／閱讀／健康。舊預設技能沒練過就移除；有等級、XP、筆記或被待辦／行程用到的保留
+  3: d => {
+    const OLD = new Set(["js", "dom", "ts", "vite", "react", "comp", "state", "git", "pda1",
+      "pixel", "spine", "chara", "live2d", "portfo", "gdd", "level", "system", "proto"]);
+    const used = new Set([...(d.todos || []), ...(d.events || [])].map(x => x.skill).filter(Boolean));
+    const keep = (d.skills || []).filter(s =>
+      !OLD.has(s.id) || s.lv > 0 || s.xp > 0 || (s.note || "").trim() || used.has(s.id));
+    const ids = new Set(keep.map(s => s.id));
+    const add = seedSkills().filter(s => !ids.has(s.id));
+    add.forEach(s => ids.add(s.id));
+    // 前置技能被移除的話拿掉，免得保留下來的技能永遠鎖住
+    keep.forEach(s => { s.req = (s.req || []).filter(r => ids.has(r)); });
+    d.skills = [...add, ...keep];
+  }
+};
+
+function seedSkills() {
+  return SEED_SKILLS.map(([id, name, cat, tier, req, maxLv, desc]) =>
+    ({ id, name, cat, tier, req, maxLv, desc, descV: 2, lv: 0, xp: 0, note: "" }));
+}
+
+function seed() {
+  return {
+    schema: SCHEMA,
+    memos: [{
+      id: uid(),
+      title: "歡迎使用 PDA",
+      body: "這是你自己的個人助理，資料只存在這台電腦。\n\n幾件事先知道：\n\n1. 所有資料存在瀏覽器的 localStorage，不會上傳任何地方。\n2. 「設定」裡有匯出 JSON，養成偶爾備份的習慣——清瀏覽器資料會把這裡清掉。\n3. 「設定 → 雲端同步」貼上 GitHub Token，手機和電腦就能同步。\n4. 想改樣子或加功能，直接用編輯器打開 pda.html 改，沒有建置流程。\n\nAlt+1 到 Alt+8 可以切換模組。",
+      updated: Date.now()
+    }],
+    todos: [],
+    events: [],
+    links: SEED_LINKS.map(([title, url, cat]) => ({ id: uid(), title, url, cat, tags: [], read: false })),
+    skills: seedSkills(),
+    settings: {
+      theme: "green", chara: true, boot: true, avatar: DEFAULT_AVATAR, userName: "斥侯",
+      wx: true,
+      place: { name: "臺北市", addr: "臺灣 臺北市", lat: 25.0478, lon: 121.5319 }
+    },
+    cache: { wx: null, at: 0 }
+  };
+}
+
+/* ================= 狀態 ================= */
+let db = load();
+const now = new Date();
+let state = {
+  view: "home",
+  memoSel: null,
+  todoFilter: "open",
+  linkCat: "全部",
+  linkQ: "",
+  memoQ: "",
+  memoTag: "",
+  memoPreview: db.settings.memoMode === "preview",
+  calY: now.getFullYear(),
+  calM: now.getMonth(),
+  daySel: TODAY(),
+  skCat: "全部", skSel: null, skEditDesc: null,
+  schedKind: "train", habitTitle: "",
+  trainSkill: "", trainDays: [1, 3, 5], trainWeeks: 2, trainTime: "20:00", trainXp: 25,
+  focus: null,
+  geoResults: [], geoBusy: false, geoErr: null,
+  dump: null
+};
+
+// 補齊缺漏欄位，避免舊資料造成錯誤（讀取與匯入共用）
+function normalize(d) {
+  d.memos ||= []; d.todos ||= []; d.events ||= []; d.links ||= [];
+  for (let v = (d.schema || 1) + 1; v <= SCHEMA; v++) if (MIGRATIONS[v]) MIGRATIONS[v](d);
+  d.schema = SCHEMA;
+  d.memos.forEach(m => { m.kb = !!m.kb; });
+  if (!Array.isArray(d.skills) || !d.skills.length) d.skills = seedSkills();
+  // 簡介升級到第 2 版：只換 desc，保留等級、XP 與個人筆記
+  const sd = Object.fromEntries(SEED_SKILLS.map(x => [x[0], x[6]]));
+  d.skills.forEach(s => { if (s.descV !== 2 && sd[s.id]) { s.desc = sd[s.id]; s.descV = 2; } });
+  d.settings ||= {};
+  d.settings.theme ||= "green";
+  // 舊預設 avatar.png 並不存在，改指向資料夾裡實際的立繪
+  if (!d.settings.avatar || d.settings.avatar === "avatar.png") d.settings.avatar = DEFAULT_AVATAR;
+  d.settings.userName ||= "斥侯";
+  if (d.settings.chara === undefined) d.settings.chara = true;
+  if (d.settings.boot === undefined) d.settings.boot = true;
+  if (d.settings.wx === undefined) d.settings.wx = true;
+  d.settings.place ||= { name: "臺北市", addr: "臺灣 臺北市", lat: 25.0478, lon: 121.5319 };
+  d.cache ||= { wx: null, at: 0 };
+  return d;
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return normalize(JSON.parse(raw));
+  } catch (e) { console.warn("讀取失敗，改用預設資料", e); }
+  return seed();
+}
+
+let saveTimer = null;
+let typeTimer = null;
+function save(immediate) {
+  clearTimeout(saveTimer);
+  const doIt = () => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(db));
+      const s = $("#saved");
+      s.classList.add("on");
+      setTimeout(() => s.classList.remove("on"), 900);
+      syncSoon();
+    } catch (e) {
+      alert("儲存失敗：" + e.message + "\n\n可能是瀏覽器空間已滿，請到設定匯出備份。");
+    }
+  };
+  immediate ? doIt() : (saveTimer = setTimeout(doIt, 350));
+}
+
+/* ================= 雲端同步（GitHub 私人 Gist） =================
+   Token 與同步狀態放在另一個 key，不會跟著匯出 JSON，也不會上傳。
+   判斷「這台有沒有改過」用內容指紋（不含天氣快取），判斷「雲端有沒有被別台改過」用 savedAt。 */
+const SYNC_KEY = "pda.v1.sync";
+const SYNC_FILE = "pda-data.json";
+const SYNC_DESC = "PDA 個人助理同步資料（自動產生，請勿手動修改）";
+let sync = loadSync();
+let syncTimer = null, syncBusy = false, syncAgain = false, syncLastPull = 0;
+function loadSync() {
+  try { return { token: "", gistId: "", remoteAt: null, hash: "", lastSync: 0, err: "", ...JSON.parse(localStorage.getItem(SYNC_KEY) || "{}") }; }
+  catch (e) { return { token: "", gistId: "", remoteAt: null, hash: "", lastSync: 0, err: "" }; }
+}
+function saveSync() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); } catch (e) {} }
+// 同步內容：整份資料去掉天氣快取
+function syncBody(d) { const { cache, ...rest } = d; return JSON.stringify(rest); }
+function syncHash(d) {
+  const s = syncBody(d); let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0;
+  return s.length + ":" + h.toString(36);
+}
+// 存檔後呼叫：內容真的變了才排程上傳（停手 5 秒）
+function syncSoon() {
+  if (!sync.token || syncHash(db) === sync.hash) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncNow(), 5000);
+  showSync();
+}
+async function gh(path, opt = {}) {
+  const r = await fetch("https://api.github.com" + path, {
+    ...opt,
+    headers: { Authorization: "Bearer " + sync.token, Accept: "application/vnd.github+json", ...(opt.body ? { "Content-Type": "application/json" } : {}) }
+  });
+  if (r.status === 401) throw new Error("Token 無效或已過期，請到設定重新貼上");
+  if (r.status === 403 || r.status === 404) throw new Error("Token 沒有 Gist 權限，或同步用的 Gist 被刪除了");
+  if (!r.ok) throw new Error("GitHub 回應 " + r.status);
+  return r.json();
+}
+async function gistRead(g) {
+  const f = g.files && g.files[SYNC_FILE];
+  if (!f) return null;
+  const text = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
+  return JSON.parse(text);
+}
+async function gistWrite() {
+  const savedAt = Date.now();
+  const content = JSON.stringify({ app: "pda", savedAt, db: JSON.parse(syncBody(db)) });
+  const body = JSON.stringify({ description: SYNC_DESC, files: { [SYNC_FILE]: { content } } });
+  const g = sync.gistId
+    ? await gh("/gists/" + sync.gistId, { method: "PATCH", body })
+    : await gh("/gists", { method: "POST", body: JSON.stringify({ ...JSON.parse(body), public: false }) });
+  sync.gistId = g.id; sync.remoteAt = savedAt; sync.hash = syncHash(db);
+}
+function applyRemote(remote) {
+  const cache = db.cache;
+  db = normalize(remote.db);
+  db.cache = cache;                      // 天氣快取留本機的
+  if (state.memoSel && !db.memos.some(m => m.id === state.memoSel)) state.memoSel = null;
+  sync.remoteAt = remote.savedAt; sync.hash = syncHash(db);
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
+  render();
+}
+// 拉一次、必要時推一次。manual = 使用者按的，失敗時跳訊息
+async function syncNow(manual) {
+  if (!sync.token) return;
+  if (syncBusy) { syncAgain = true; return; }
+  clearTimeout(syncTimer);
+  syncBusy = true; showSync();
+  try {
+    // 第一次用：找找看帳號裡是否已有同步用的 Gist（另一台建立的）
+    if (!sync.gistId) {
+      const list = await gh("/gists?per_page=100");
+      const hit = list.find(g => g.files && g.files[SYNC_FILE] && g.description === SYNC_DESC);
+      if (hit) sync.gistId = hit.id;
+    }
+    const remote = sync.gistId ? await gistRead(await gh("/gists/" + sync.gistId)) : null;
+    const localChanged = syncHash(db) !== sync.hash;
+    const remoteChanged = !!remote && remote.savedAt !== sync.remoteAt;
+
+    if (!remote) await gistWrite();                       // 雲端還沒有資料：上傳這台的
+    else if (sync.remoteAt === null) {                    // 這台第一次連上已有資料的雲端
+      if (confirm(`雲端已經有資料（${new Date(remote.savedAt).toLocaleString("zh-TW")} 存的）。\n\n按「確定」：下載雲端資料，取代這台的（這台的會先自動備份）。\n按「取消」：改用這台的資料覆蓋雲端。`)) {
+        snapshot("同步前"); applyRemote(remote);
+      } else if (confirm("確定要用這台的資料覆蓋雲端？\n（雲端舊資料仍可在 GitHub Gist 的 Revisions 找回）")) await gistWrite();
+      else throw new Error("尚未同步：已取消");
+    }
+    else if (remoteChanged && localChanged) {             // 兩邊都改過
+      if (confirm(`其他裝置在 ${new Date(remote.savedAt).toLocaleString("zh-TW")} 更新了雲端，這台也有還沒同步的修改。\n\n按「確定」：用雲端的（這台的修改會先自動備份）。\n按「取消」：用這台的覆蓋雲端（雲端舊資料可在 Gist 的 Revisions 找回）。`)) {
+        snapshot("同步衝突"); applyRemote(remote);
+      } else await gistWrite();
+    }
+    else if (remoteChanged) applyRemote(remote);
+    else if (localChanged) await gistWrite();
+
+    sync.lastSync = Date.now(); sync.err = ""; syncLastPull = Date.now();
+  } catch (e) {
+    sync.err = navigator.onLine === false ? "目前離線，恢復連線後會再同步" : e.message;
+    if (manual) alert("同步失敗：" + sync.err);
+  } finally {
+    syncBusy = false; saveSync(); showSync();
+    if (state.view === "set") render();
+    if (syncAgain) { syncAgain = false; syncNow(); }
+  }
+}
+// 頂端列的小狀態
+function showSync() {
+  const el = document.getElementById("syncSt");
+  if (!el) return;
+  if (!sync.token) { el.textContent = ""; return; }
+  const pending = syncHash(db) !== sync.hash;
+  el.textContent = syncBusy ? "☁ 同步中…" : sync.err ? "☁ 同步失敗" : pending ? "☁ 待上傳" : "☁ 已同步";
+  el.title = sync.err || (sync.lastSync ? "上次同步：" + new Date(sync.lastSync).toLocaleString("zh-TW") : "");
+  el.classList.toggle("bad", !!sync.err);
+}
+// 切回這個分頁時拉一次（10 秒內不重複）；離開分頁時有待上傳的就立刻送
+document.addEventListener("visibilitychange", () => {
+  if (!sync.token) return;
+  if (document.visibilityState === "visible" && Date.now() - syncLastPull > 10000) syncNow();
+  if (document.visibilityState === "hidden" && syncHash(db) !== sync.hash) syncNow();
+});
+window.addEventListener("online", () => syncNow());
+
+/* ================= 版面 ================= */
+const MODULES = [
+  { id: "home",  name: "首頁",     ic: "⌂" },
+  { id: "memo",  name: "備忘錄",   ic: "▤" },
+  { id: "kb",    name: "知識庫",   ic: "◈" },
+  { id: "todo",  name: "待辦",     ic: "☑" },
+  { id: "cal",   name: "行事曆",   ic: "▦" },
+  { id: "skill", name: "技能樹",   ic: "⚔" },
+  { id: "link",  name: "分頁收藏", ic: "★" },
+  { id: "set",   name: "設定",     ic: "⚙" }
+];
+
+function openCount() { return db.todos.filter(t => !t.done).length; }
+
+function renderTabs() {
+  const nav = $("#tabs");
+  if (!nav) return;
+  nav.innerHTML = MODULES.map(m => {
+    const n = m.id === "todo" ? openCount() : 0;
+    return `<button data-go="${m.id}" class="${state.view === m.id ? "on" : ""}">
+      <span class="ic">${m.ic}</span>${m.name}${n ? `<span class="badge">${n}</span>` : ""}
+    </button>`;
+  }).join("");
+  // 窄螢幕的頂部分頁列可橫向捲動，把目前的分頁捲到中間，免得停在畫面外
+  const on = nav.querySelector(".on");
+  if (on && nav.scrollWidth > nav.clientWidth) {
+    const r = on.getBoundingClientRect(), nr = nav.getBoundingClientRect();
+    nav.scrollLeft += r.left - nr.left - (nav.clientWidth - r.width) / 2;
+  }
+  // 側欄的點擊切換（innerHTML 重建後 handler 會消失，所以每次都要重綁）
+  nav.onclick = e => {
+    const b = e.target.closest("[data-go]");
+    if (b) go(b.dataset.go);
+  };
+}
+
+function render() {
+  document.getElementById("app").dataset.theme = db.settings.theme || "green";
+  renderTabs();
+  const v = $("#view");
+  v.innerHTML = ({ home: viewHome, memo: viewMemo, kb: viewMemo, todo: viewTodo, cal: viewCal, skill: viewSkill, link: viewLink, set: viewSet })[state.view]();
+  wire();
+  updateChara();
+  renderWx();
+  if (state.view === "skill" && typeof requestAnimationFrame === "function") requestAnimationFrame(drawSkillLines);
+  if (state.focus) {
+    const f = $(state.focus);
+    if (f) { f.focus(); if (f.setSelectionRange && f.value) f.setSelectionRange(f.value.length, f.value.length); }
+    state.focus = null;
+  }
+}
+function go(id) {
+  // 備忘錄與知識庫共用搜尋／標籤狀態，換模組時清掉，免得帶著另一邊的篩選
+  if (id !== state.view) { state.memoQ = ""; state.memoTag = ""; }
+  state.view = id; render();
+}
+// 打開某則筆記，必要時切到它所屬的模組
+function showMemo(m) {
+  const v = m.kb ? "kb" : "memo";
+  if (state.view !== v) go(v);
+  state.memoSel = m.id; state.memoPreview = db.settings.memoMode === "preview"; render();
+}
+
+/* ================= 天氣（Open-Meteo，免金鑰） ================= */
+// WMO weather code → 中文
+const WMO = {
+  0: "晴", 1: "大致晴朗", 2: "局部多雲", 3: "陰天",
+  45: "有霧", 48: "霧淞",
+  51: "毛毛雨", 53: "毛毛雨", 55: "毛毛雨（大）",
+  56: "凍毛雨", 57: "凍毛雨（大）",
+  61: "小雨", 63: "中雨", 65: "大雨",
+  66: "凍雨", 67: "凍雨（大）",
+  71: "小雪", 73: "中雪", 75: "大雪", 77: "霰",
+  80: "陣雨", 81: "陣雨（強）", 82: "陣雨（劇烈）",
+  85: "陣雪", 86: "陣雪（大）",
+  95: "雷雨", 96: "雷雨夾冰雹", 99: "雷雨夾冰雹（強）"
+};
+const wmoText = c => WMO[c] ?? `天氣代碼 ${c}`;
+
+let wxBusy = false;
+async function fetchWeather(force) {
+  const p = db.settings.place;
+  if (!p || wxBusy) return;
+  // 30 分鐘內不重抓
+  if (!force && db.cache.wx && Date.now() - db.cache.at < 30 * 60 * 1000) return;
+  wxBusy = true;
+  renderWx();
+  try {
+    const u = "https://api.open-meteo.com/v1/forecast"
+      + `?latitude=${p.lat}&longitude=${p.lon}`
+      + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"
+      + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+      + "&timezone=auto&forecast_days=4";
+    const r = await fetch(u);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    db.cache.wx = await r.json();
+    db.cache.at = Date.now();
+    db.cache.err = null;
+    save(true);
+  } catch (e) {
+    db.cache.err = e.message;
+  } finally {
+    wxBusy = false;
+    renderWx();
+  }
+}
+
+function renderWx() {
+  const side = document.getElementById("infoSide");
+  // 天氣卡同時存在於右欄與首頁（窄螢幕用），兩處都要填
+  const boxes = [document.getElementById("wx"), document.getElementById("wxHome")].filter(Boolean);
+  if (!boxes.length || !side) return;
+  if (db.settings.wx === false) { side.classList.add("hide"); return; }
+  side.classList.remove("hide");
+
+  const p = db.settings.place || {};
+  const w = db.cache.wx;
+  let body;
+
+  if (!w) {
+    body = wxBusy
+      ? `<div class="muted">讀取中…</div>`
+      : `<div class="wx-err">無法取得天氣${db.cache.err ? "（" + esc(db.cache.err) + "）" : ""}</div>
+         <div class="muted" style="margin-top:6px">可能是離線，或瀏覽器擋下了 file:// 的跨網域請求。</div>
+         <button class="btn sm" data-act="wxRefresh" style="margin-top:8px">重試</button>`;
+  } else {
+    const c = w.current, d = w.daily;
+    const age = Math.round((Date.now() - db.cache.at) / 60000);
+    const days = d.time.map((t, i) => {
+      const dt = new Date(t + "T00:00:00");
+      const label = i === 0 ? "今天" : i === 1 ? "明天" : `${WD[dt.getDay()]}`;
+      const rain = d.precipitation_probability_max?.[i];
+      return `<div class="wx-day">
+        <span class="d">${label}</span>
+        <span>${esc(wmoText(d.weather_code[i]))}${rain != null ? ` <span class="wx-rain">${rain}%</span>` : ""}</span>
+        <span class="t">${Math.round(d.temperature_2m_max[i])}° <span class="lo">/ ${Math.round(d.temperature_2m_min[i])}°</span></span>
+      </div>`;
+    }).join("");
+    body = `
+      <div class="wx-now">
+        <span class="wx-temp">${Math.round(c.temperature_2m)}°</span>
+        <span class="wx-desc">${esc(wmoText(c.weather_code))}</span>
+      </div>
+      <div class="wx-meta">
+        體感 ${Math.round(c.apparent_temperature)}°　濕度 ${c.relative_humidity_2m}%<br>
+        風速 ${c.wind_speed_10m} km/h
+      </div>
+      <div style="margin-top:10px">${days}</div>
+      <div class="muted" style="margin-top:10px; font-size:10px">
+        ${age < 1 ? "剛剛更新" : age + " 分鐘前更新"}
+        <span class="geo-hit" data-act="wxRefresh" style="margin-left:6px; color:var(--accent2)">↻ 重整</span>
+      </div>`;
+  }
+
+  const html = `
+    <div class="wx-head">天氣資訊 ・ ${esc(p.name || "未設定地點")}</div>
+    <div class="wx-addr">${esc(p.addr || "")}<br>${p.lat != null ? `${(+p.lat).toFixed(4)}, ${(+p.lon).toFixed(4)}` : ""}${p.how ? `<br><span style="color:var(--accent2)">${esc(p.how)}</span>` : ""}</div>
+    ${body}`;
+
+  boxes.forEach(box => {
+    box.innerHTML = html;
+    box.onclick = e => { if (e.target.closest('[data-act="wxRefresh"]')) fetchWeather(true); };
+  });
+  renderRail();
+}
+
+// 右欄的另外兩張卡：今日訓練、技能焦點
+function renderRail() {
+  const t = document.getElementById("railTrain");
+  const k = document.getElementById("railSkill");
+
+  if (t) {
+    const today = db.events.filter(e => isPlan(e) && e.date === TODAY())
+      .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    const upcoming = db.events.filter(e => isPlan(e) && !e.done && e.date > TODAY())
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    t.innerHTML = `
+      <div class="card-h"><span class="t">今日訓練與行動</span><span class="more" data-go="cal">查看行事曆</span></div>
+      ${today.length ? today.map(e => {
+        const s = skById(e.skill);
+        return `<div class="item ${e.done ? "done" : ""}">
+          <button class="tick ${e.done ? "on" : ""}" data-act="trToggle" data-id="${e.id}">${e.done ? "✓" : ""}</button>
+          <div class="body">
+            <div class="title">${esc(s ? s.name : e.title)}</div>
+            <div class="sub">${esc(e.time || "")}　${s ? `+${e.xp || 25} XP` : "◇ 日常行動"}</div>
+          </div>
+        </div>`;
+      }).join("") : `<div class="muted">今天沒有排訓練或行動。${upcoming.length ? `下一場 ${fmtDate(upcoming[0].date)}` : ""}</div>`}`;
+    t.onclick = railClick;
+  }
+
+  if (k) {
+    const focus = db.skills.filter(s => skState(s) === "learning")
+      .sort((a, b) => (b.lv * XP_PER_LV + b.xp) - (a.lv * XP_PER_LV + a.xp)).slice(0, 4);
+    const ready = db.skills.filter(s => skState(s) === "ready").slice(0, 3);
+    k.innerHTML = `
+      <div class="card-h"><span class="t">技能進度</span><span class="more" data-go="skill">技能樹</span></div>
+      ${focus.length ? focus.map(s => `
+        <div style="margin-bottom:11px">
+          <div class="row" style="font-size:12px"><span class="grow">${esc(s.name)}</span><span class="muted">Lv.${s.lv}/${s.maxLv}</span></div>
+          <div class="bar"><i style="width:${s.lv >= s.maxLv ? 100 : Math.round(s.xp / XP_PER_LV * 100)}%"></i></div>
+        </div>`).join("")
+      : `<div class="muted" style="margin-bottom:8px">還沒有學習中的技能。</div>`}
+      ${ready.length ? `<div class="muted" style="border-top:1px solid var(--line); padding-top:9px">可開始：${ready.map(s => esc(s.name)).join("、")}</div>` : ""}`;
+    k.onclick = railClick;
+  }
+}
+
+function railClick(e) {
+  const el = e.target.closest("[data-act],[data-go]");
+  if (!el) return;
+  if (el.dataset.act === "trToggle") {
+    const ev = db.events.find(x => x.id === el.dataset.id);
+    if (ev) { ev.done = !ev.done; say(syncEventXp(ev)); save(true); render(); }
+    return;
+  }
+  if (el.dataset.go) go(el.dataset.go);
+}
+
+/* ---- 定位：GPS / IP / 反向地理編碼 ---- */
+
+// 經緯度 → 完整地址（OpenStreetMap Nominatim，免金鑰）
+async function reverseGeo(lat, lon) {
+  const r = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=zh-TW&zoom=18`
+  );
+  if (!r.ok) throw new Error("反向地理編碼 HTTP " + r.status);
+  const j = await r.json();
+  const a = j.address || {};
+  const name = a.village || a.suburb || a.town || a.city_district || a.city || a.county || j.name || "目前位置";
+  return { name, addr: j.display_name || "" };
+}
+
+async function applyLocation(lat, lon, how) {
+  try {
+    const g = await reverseGeo(lat, lon);
+    db.settings.place = { name: g.name, addr: g.addr, lat, lon, how };
+  } catch (e) {
+    // 反查失敗也還是把座標存起來，天氣照樣抓得到
+    db.settings.place = { name: "目前位置", addr: `${(+lat).toFixed(4)}, ${(+lon).toFixed(4)}`, lat, lon, how };
+  }
+  db.cache.wx = null; db.cache.at = 0;
+  state.geoResults = []; state.geoBusy = false;
+  save(true); render();
+  fetchWeather(true);
+}
+
+// 瀏覽器定位（GPS / WiFi，需要授權，精度可到數十公尺）
+function locateGPS() {
+  if (!navigator.geolocation) { state.geoErr = "這個瀏覽器不支援定位"; render(); return; }
+  state.geoBusy = true; state.geoErr = null; render();
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      applyLocation(latitude, longitude, `瀏覽器定位・誤差約 ${Math.round(accuracy)} 公尺`);
+    },
+    err => {
+      state.geoBusy = false;
+      state.geoErr = `定位失敗：${err.message}。若是在 file:// 下被封鎖，改用下方的 IP 定位。`;
+      render();
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+  );
+}
+
+// IP 定位（不需授權，城市級精度）
+async function locateIP() {
+  state.geoBusy = true; state.geoErr = null; render();
+  try {
+    const r = await fetch("https://ipwho.is/");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    if (j.success === false) throw new Error(j.message || "IP 定位失敗");
+    await applyLocation(j.latitude, j.longitude, `IP 定位・${[j.city, j.region].filter(Boolean).join(" ")}`);
+  } catch (e) {
+    state.geoErr = "IP 定位失敗：" + e.message;
+    state.geoBusy = false; render();
+  }
+}
+
+// 地點搜尋（Open-Meteo geocoding）
+async function geoSearch(q) {
+  state.geoBusy = true; state.geoErr = null; render();
+  try {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=zh`);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    state.geoResults = j.results || [];
+    if (!state.geoResults.length) state.geoErr = "查不到這個地點";
+  } catch (e) {
+    state.geoErr = e.message;
+    state.geoResults = [];
+  } finally {
+    state.geoBusy = false; render();
+  }
+}
+
+/* ================= 首頁 ================= */
+// 距離上次「匯出 JSON」幾天；從沒匯出過回傳 null。超過 BACKUP_DAYS 天 NAVI 會提醒
+const BACKUP_DAYS = 7;
+function backupAge() {
+  const t = db.settings.lastExport;
+  return t ? Math.floor((Date.now() - t) / 86400000) : null;
+}
+
+// 臨時讓 NAVI 說一句話（升級播報等），12 秒後自動回到狀態播報
+let naviSay = null;
+function say(txt) {
+  if (!txt) return;
+  naviSay = { txt, at: Date.now() };
+  setTimeout(() => { if (naviSay && Date.now() - naviSay.at >= 12000) { naviSay = null; updateChara(); } }, 12200);
+}
+
+// NAVI 依照目前狀態列出要說的話（重要的排前面），點對話框輪流看下一句
+let naviIdx = 0;
+function charaLines() {
+  if (naviSay && Date.now() - naviSay.at < 12000) return [naviSay.txt];
+  naviSay = null;
+  const h = new Date().getHours();
+  const open = db.todos.filter(t => !t.done);
+  const over = open.filter(t => t.due && daysFromToday(t.due) < 0);
+  const today = open.filter(t => t.due === TODAY());
+  const ev = db.events.filter(e => e.date === TODAY());
+  const lines = [];
+
+  if (over.length) lines.push(`有 ${over.length} 件事情已經逾期了……先解決掉一件，狀況就會好轉。`);
+  const bk = backupAge();
+  if (bk === null) lines.push(`還沒有匯出過備份……清瀏覽器資料會把這裡全部清掉。到「設定」按一下「匯出 JSON」吧。`);
+  else if (bk >= BACKUP_DAYS) lines.push(`距離上次匯出備份已經 ${bk} 天了。到「設定」匯出一份新的，資料才安全。`);
+  if (today.length && ev.length) lines.push(`今天有 ${today.length} 件待辦和 ${ev.length} 個行程。行程優先，剩下的時間再排待辦。`);
+  else if (today.length) lines.push(`今天有 ${today.length} 件事要完成。一件一件來就好，不用急。`);
+  else if (ev.length) lines.push(`今天沒有到期的待辦，但有 ${ev.length} 個行程。別忘了。`);
+  else if (!open.length && db.todos.length) lines.push(`待辦全部清空了。難得的空檔，做點自己想做的事吧。`);
+  if (lines.length) return lines;
+  if (h < 5) return [`這種時間還醒著……身體要顧，該休息了。`];
+  if (h < 11) return [`早安。今天沒有到期的項目，是可以往前推進度的日子。`];
+  if (h < 18) return [`午安。清單上沒有急件，狀態良好。`];
+  return [`晚上好。今天辛苦了，剩下的時間留給自己。`];
+}
+
+// 左側立繪與對話框（在所有畫面都常駐，只在內容改變時重打字）
+function updateChara() {
+  const side = document.getElementById("charaSide");
+  if (!side) return;
+  if (db.settings.chara === false) side.classList.add("hide");
+  else side.classList.remove("hide");
+
+  const img = document.getElementById("charaImg");
+  const ph = document.getElementById("charaPh");
+  const src = db.settings.avatar || DEFAULT_AVATAR;
+  if (img && img.getAttribute("src") !== src) {
+    img.style.display = "";
+    if (ph) ph.style.display = "none";
+    img.setAttribute("src", src);
+  }
+  // 窄螢幕時立繪降為半透明背景襯底
+  const bg = document.getElementById("charaBg");
+  if (bg) bg.style.backgroundImage = db.settings.chara === false ? "" : `url("${src}")`;
+
+  const say = document.getElementById("say");
+  if (!say) return;
+  const lines = charaLines();
+  const txt = lines[naviIdx % lines.length];
+  // 不只一句時才顯示 ▼，點一下換下一句（臨時播報則是點掉）
+  const bubble = say.closest(".bubble");
+  bubble.classList.toggle("more", lines.length > 1 || !!naviSay);
+  bubble.onclick = () => {
+    if (naviSay) naviSay = null; else naviIdx++;
+    updateChara();
+  };
+  if (say.dataset.txt === txt) return;   // 內容沒變就不要重打，避免每次切畫面都閃
+  say.dataset.txt = txt;
+  clearInterval(typeTimer);
+  say.textContent = "";
+  let i = 0;
+  typeTimer = setInterval(() => {
+    say.textContent = txt.slice(0, ++i);
+    if (i >= txt.length) clearInterval(typeTimer);
+  }, 32);
+}
+
+function viewHome() {
+  const now = new Date();
+  const h = now.getHours();
+  const hello = h < 5 ? "夜深了" : h < 11 ? "早安" : h < 14 ? "午安" : h < 18 ? "下午好" : "晚上好";
+  const wave = h < 5 ? "🌙" : h < 11 ? "☀️" : h < 18 ? "👋" : "🌆";
+
+  const open = db.todos.filter(x => !x.done);
+  // 今天勾完成的（舊資料沒有 doneAt，不算進來）
+  const doneToday = db.todos.filter(x => x.done && x.doneAt && iso(new Date(x.doneAt)) === TODAY()).length;
+  const overdue = open.filter(x => x.due && daysFromToday(x.due) < 0);
+  const todayTodo = open.filter(x => x.due === TODAY());
+  const todayEv = db.events.filter(e => e.date === TODAY()).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const todayTrain = todayEv.filter(isPlan);
+  const trainDone = todayTrain.filter(e => e.done).length;
+  const recent = [...db.memos].sort((a, b) => b.updated - a.updated).slice(0, 3);
+
+  const totalLv = db.skills.reduce((a, s) => a + s.lv, 0);
+  const maxLv = db.skills.reduce((a, s) => a + s.maxLv, 0) || 1;
+  const learning = db.skills.filter(s => skState(s) === "learning")
+    .sort((a, b) => (b.lv * XP_PER_LV + b.xp) - (a.lv * XP_PER_LV + a.xp)).slice(0, 4);
+
+  // 近期行程：今天以後最近的五筆
+  const soon = db.events.filter(e => e.date >= TODAY())
+    .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || ""))).slice(0, 5);
+
+  const listRow = t => {
+    const late = !t.done && t.due && daysFromToday(t.due) < 0;
+    const s = t.skill ? skById(t.skill) : null;
+    return `<div class="item ${t.done ? "done" : ""}">
+      <button class="tick ${t.done ? "on" : ""}" data-act="toggleTodo" data-id="${t.id}">${t.done ? "✓" : ""}</button>
+      <div class="body">
+        <div class="title">${esc(t.text)}${s ? `<span class="tag" style="margin-left:6px">${esc(s.name)}</span>` : ""}</div>
+      </div>
+      <span class="muted ${late ? "overdue" : ""}" style="white-space:nowrap">${t.due ? (late ? "逾期" : t.due === TODAY() ? "今天" : fmtDate(t.due)) : ""}</span>
+      ${t.pri ? `<span class="dot-p" style="background:var(--danger)"></span>` : ""}
+    </div>`;
+  };
+
+  return `
+    <h2>${hello}，${esc(db.settings.userName || "你")} ${wave}</h2>
+    <div class="sub-line mono">${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(h)}:${pad(now.getMinutes())}</div>
+
+    <div class="row wrap" style="margin-bottom:18px">
+      <button class="btn" data-act="focusQuick">＋ 快速新增待辦</button>
+      <button class="btn" data-act="newMemo" data-go="memo">▤ 新增備忘</button>
+      <button class="btn" data-act="newMemo" data-go="kb">◈ 新增知識</button>
+      <button class="btn" data-go="cal">⚔ 排訓練／行動</button>
+      <button class="btn" data-go="skill">技能樹</button>
+    </div>
+
+    <!-- 快速新增放在最上面，手機打開就能記 -->
+    <div class="row" style="margin-bottom:14px">
+      <input type="text" id="quickTodo" class="grow" placeholder="快速記一件事，按 Enter 加入待辦">
+      <button class="btn pri" data-act="quickAdd">加入</button>
+    </div>
+
+    <div class="grid c3" style="margin-bottom:14px">
+      <div class="stat ok"><div class="k">今日待辦</div><div class="v">${doneToday} / ${todayTodo.length + doneToday}</div><div class="n">已完成 ${doneToday} 件</div></div>
+      <div class="stat"><div class="k">未完成</div><div class="v">${open.length}</div><div class="n">待辦任務</div></div>
+      <div class="stat ${overdue.length ? "bad" : ""}"><div class="k">逾期任務</div><div class="v">${overdue.length}</div><div class="n">${overdue.length ? "需要處理" : "沒有逾期"}</div></div>
+      <div class="stat ok"><div class="k">今日訓練／行動</div><div class="v">${trainDone} / ${todayTrain.length}</div><div class="n">${todayTrain.length ? "照表操課" : "今天沒排"}</div></div>
+      <div class="stat ok"><div class="k">技能完成度</div><div class="v">${Math.round(totalLv / maxLv * 100)}%</div><div class="n">總等級 ${totalLv} / ${maxLv}</div></div>
+    </div>
+
+    <div class="grid c2" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-h"><span class="t">今日任務</span><span class="more" data-go="todo">查看全部</span></div>
+        ${[...overdue, ...todayTodo].length
+          ? [...overdue, ...todayTodo].map(listRow).join("")
+          : `<div class="muted">今天沒有到期的待辦。${open.length ? `還有 ${open.length} 件未排期的事。` : ""}</div>`}
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">近期行程</span><span class="more" data-go="cal">查看行事曆</span></div>
+        ${soon.length ? `<div class="tl">${soon.map(e => {
+          const s = e.skill ? skById(e.skill) : null;
+          const cls = e.date === TODAY() ? "" : "soon";
+          return `<div class="tl-i ${cls}">
+            <div class="t">${s ? `<span class="tag">⚔ +${e.xp || 25}XP</span>` : ""}${e.type === "habit" ? `<span class="tag">◇ 日常</span>` : ""}${esc(e.title)}</div>
+            <div class="d">${fmtDate(e.date)} ${esc(e.time || "")}${s ? `　${esc(s.cat)}／Lv.${s.lv}` : ""}${e.done ? "　已完成" : ""}</div>
+          </div>`;
+        }).join("")}</div>` : `<div class="muted">近期沒有行程。到行事曆排訓練吧。</div>`}
+      </div>
+    </div>
+
+    <div class="card wx-box wx-home" id="wxHome" style="margin-bottom:14px"></div>
+
+    <div class="grid c2">
+      <div class="card">
+        <div class="card-h"><span class="t">最近筆記</span><span><span class="more" data-go="kb">知識庫</span><span class="more" data-go="memo" style="margin-left:12px">備忘錄</span></span></div>
+        ${recent.length ? recent.map(m => `
+          <div class="item" data-act="openMemo" data-id="${m.id}" style="cursor:pointer">
+            <div class="body">
+              <div class="title"><span class="muted">${m.kb ? "◈" : "▤"}</span> ${esc(m.title || "（無標題）")}</div>
+              <div class="sub">${esc((m.body || "").slice(0, 46).replace(/\n/g, " "))}</div>
+            </div>
+            <span class="muted" style="white-space:nowrap">${new Date(m.updated).toLocaleDateString("zh-TW")}</span>
+          </div>`).join("") : `<div class="muted">還沒有筆記。</div>`}
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">學習中的技能</span><span class="more" data-go="skill">查看全部</span></div>
+        ${learning.length ? learning.map(s => `
+          <div style="margin-bottom:12px">
+            <div class="row" style="font-size:13px">
+              <span class="grow">${esc(s.name)}</span>
+              <span class="muted">${s.lv >= s.maxLv ? "已精通" : `Lv.${s.lv}/${s.maxLv}`}</span>
+            </div>
+            <div class="bar"><i style="width:${s.lv >= s.maxLv ? 100 : Math.round(s.xp / XP_PER_LV * 100)}%"></i></div>
+          </div>`).join("")
+        : `<div class="muted">還沒有學習中的技能。到技能樹點開一個，或把待辦關聯到技能。</div>`}
+      </div>
+    </div>`;
+}
+
+/* ================= 備忘錄 ================= */
+// 知識庫：內文裡的 #標籤 與「相關：標題A、標題B」
+// 標籤前面必須是行首或空白，網址裡的 # 與「## 標題」不會被誤認
+const memoTags = m => [...new Set([...(m.body || "").matchAll(/(?:^|\s)#([^\s#，,。、；;]+)/g)].map(x => x[1]))];
+const titleKey = s => String(s || "").trim().replace(/[?？]$/, "").toLowerCase();
+function memoLinks(m) {
+  const out = [];
+  (m.body || "").split("\n").forEach(line => {
+    const r = line.match(/^\s*相關\s*[:：]\s*(.+)$/);
+    if (r) r[1].split(/[、,，]/).map(s => s.trim()).filter(Boolean).forEach(t => out.push(t));
+  });
+  return out;
+}
+const memoByTitle = t => db.memos.find(m => titleKey(m.title) === titleKey(t));
+
+/* ---- 編輯器：字數、預覽、工具列 ---- */
+const charCount = s => String(s || "").replace(/\s/g, "").length;
+
+// 輕量 Markdown：## 標題、**粗體**、• / - / 1. 清單、#標籤、相關：、出處：、網址
+function mdInline(s) {
+  return esc(s)
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`)
+    .replace(/(^|\s)#([^\s#，,。、；;<]+)/g, (_, a, t) => `${a}<span class="chip sm" data-act="memoTag" data-tag="${t}">#${t}</span>`);
+}
+function mdRender(body) {
+  return String(body || "").split("\n").map(line => {
+    let r;
+    if (!line.trim()) return `<div class="md-gap"></div>`;
+    if ((r = line.match(/^(#{1,3})\s+(.*)$/))) return `<div class="md-h${r[1].length}">${mdInline(r[2])}</div>`;
+    if ((r = line.match(/^\s*相關\s*[:：]\s*(.+)$/))) return `<div class="md-rel"><span class="muted">相關</span>${r[1].split(/[、,，]/).map(t => t.trim()).filter(Boolean).map(t => {
+      const m = memoByTitle(t);
+      return m ? `<span class="chip on sm" data-act="selMemo" data-id="${m.id}">→ ${esc(m.title)}</span>`
+               : `<span class="chip sm" data-act="newMemoTitled" data-title="${esc(t)}">＋ ${esc(t)}</span>`;
+    }).join("")}</div>`;
+    if ((r = line.match(/^\s*出處\s*[:：]\s*(.*)$/))) return `<div class="md-src">出處：${mdInline(r[1])}</div>`;
+    if ((r = line.match(/^(\s*)(?:[•\-*])\s+(.*)$/))) return `<div class="md-li" style="margin-left:${r[1].length * 8}px"><span class="md-mk">•</span><span>${mdInline(r[2])}</span></div>`;
+    if ((r = line.match(/^(\s*)(\d+)[.、]\s*(.*)$/))) return `<div class="md-li" style="margin-left:${r[1].length * 8}px"><span class="md-mk">${r[2]}.</span><span>${mdInline(r[3])}</span></div>`;
+    return `<div>${mdInline(line)}</div>`;
+  }).join("");
+}
+
+// 範本可在設定修改；{出處} 會換成最近一篇寫過的出處，連續讀同一本書時不用重打
+const DEFAULT_MEMO_TPL = "出處：{出處}\n\n答案：\n• \n\n我要怎麼用：\n• \n\n相關：\n#";
+function memoTemplate(curId) {
+  const recent = [...db.memos].filter(m => m.id !== curId).sort((a, b) => b.updated - a.updated);
+  let src = "《書名》作者，p.";
+  for (const m of recent) {
+    const r = (m.body || "").match(/^\s*出處\s*[:：]\s*(.+)$/m);
+    if (r) { src = r[1].replace(/p\.\s*\d+.*$/, "p.").trim(); break; }
+  }
+  return (db.settings.memoTpl || DEFAULT_MEMO_TPL).split("{出處}").join(src);
+}
+
+// 在 textarea 的選取範圍套用編輯，完成後觸發 input 讓自動儲存照常運作
+function mdEdit(ta, fn) {
+  const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+  const r = fn(v, s, e);
+  ta.value = r.value;
+  ta.focus();
+  ta.setSelectionRange(r.s, r.e ?? r.s);
+  ta.dispatchEvent(new Event("input"));
+}
+function mdAction(k) {
+  const ta = $("#memoBody");
+  if (!ta) return;
+  const lineStart = (v, s) => v.lastIndexOf("\n", s - 1) + 1;
+  const prefixLines = (pre, strip) => mdEdit(ta, (v, s, e) => {
+    const a = lineStart(v, s);
+    let n = 0;
+    const block = v.slice(a, e).split("\n").map(l => {
+      if (strip.test(l)) return l.replace(strip, "");
+      n++; return (typeof pre === "function" ? pre(n) : pre) + l;
+    }).join("\n");
+    return { value: v.slice(0, a) + block + v.slice(e), s: a + block.length };
+  });
+  const insert = (txt, caret) => mdEdit(ta, (v, s, e) => {
+    const nl = s > 0 && v[s - 1] !== "\n" ? "\n" : "";
+    return { value: v.slice(0, s) + nl + txt + v.slice(e), s: s + nl.length + (caret ?? txt.length) };
+  });
+  switch (k) {
+    case "tpl": {
+      const m = db.memos.find(x => x.id === state.memoSel);
+      const t = memoTemplate(m && m.id);
+      if (!ta.value.trim()) mdEdit(ta, () => ({ value: t, s: t.indexOf("\n") }));
+      else insert("\n" + t, t.indexOf("\n") + 1);
+      break;
+    }
+    case "h":  prefixLines("## ", /^#{1,3}\s+/); break;
+    case "ul": prefixLines("• ", /^\s*[•\-*]\s+/); break;
+    case "ol": prefixLines(n => n + ". ", /^\s*\d+[.、]\s*/); break;
+    case "b": mdEdit(ta, (v, s, e) => {
+      const sel = v.slice(s, e) || "粗體文字";
+      return { value: v.slice(0, s) + "**" + sel + "**" + v.slice(e), s: s + 2, e: s + 2 + sel.length };
+    }); break;
+    case "rel": insert("相關："); break;
+    case "tag": mdEdit(ta, (v, s, e) => {
+      const sp = s > 0 && !/\s/.test(v[s - 1]) ? " " : "";
+      return { value: v.slice(0, s) + sp + "#" + v.slice(e), s: s + sp.length + 1 };
+    }); break;
+  }
+}
+
+// Enter 自動接續清單、Tab 縮排、Ctrl+B 粗體
+function mdKeydown(e) {
+  const ta = e.target;
+  if (e.isComposing || e.keyCode === 229) return;   // 中文輸入法選字中不要攔截
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); mdAction("b"); return; }
+  if (e.key === "Tab") {
+    e.preventDefault();
+    mdEdit(ta, (v, s) => {
+      const a = v.lastIndexOf("\n", s - 1) + 1;
+      if (e.shiftKey) {
+        const cut = (v.slice(a).match(/^ {1,2}/) || [""])[0].length;
+        return { value: v.slice(0, a) + v.slice(a + cut), s: Math.max(a, s - cut) };
+      }
+      return { value: v.slice(0, a) + "  " + v.slice(a), s: s + 2 };
+    });
+    return;
+  }
+  if (e.key !== "Enter" || e.shiftKey || ta.selectionStart !== ta.selectionEnd) return;
+  const v = ta.value, s = ta.selectionStart;
+  const a = v.lastIndexOf("\n", s - 1) + 1;
+  const r = v.slice(a, s).match(/^(\s*)([•\-*]|\d+[.、])(\s+)(.*)$/);
+  if (!r) return;
+  e.preventDefault();
+  if (!r[4].trim() && v.slice(s, v.indexOf("\n", s) < 0 ? v.length : v.indexOf("\n", s)).trim() === "") {
+    // 空項目再按 Enter：結束清單
+    mdEdit(ta, () => ({ value: v.slice(0, a) + v.slice(s), s: a }));
+    return;
+  }
+  const mk = /\d/.test(r[2]) ? (parseInt(r[2], 10) + 1) + r[2].slice(-1) : r[2];
+  const ins = "\n" + r[1] + mk + r[3];
+  mdEdit(ta, () => ({ value: v.slice(0, s) + ins + v.slice(s), s: s + ins.length }));
+}
+
+function memoMetaHtml(cur) {
+  const tags = memoTags(cur);
+  const links = memoLinks(cur);
+  const back = cur.title.trim()
+    ? db.memos.filter(m => m.id !== cur.id && memoLinks(m).some(t => titleKey(t) === titleKey(cur.title)))
+    : [];
+  const row = (label, html) => `<div class="memo-meta-row"><span class="muted">${label}</span>${html}</div>`;
+  return [
+    tags.length ? row("標籤", tags.map(t => `<span class="chip" data-act="memoTag" data-tag="${esc(t)}">#${esc(t)}</span>`).join("")) : "",
+    links.length ? row("→ 我連到", links.map(t => {
+      const m = memoByTitle(t);
+      return m
+        ? `<span class="chip on" data-act="selMemo" data-id="${m.id}">→ ${esc(m.title)}</span>`
+        : `<span class="chip" data-act="newMemoTitled" data-title="${esc(t)}" title="還沒有這篇，點一下建立">＋ ${esc(t)}</span>`;
+    }).join("")) : "",
+    back.length ? row("← 連到我", back.map(m => `<span class="chip back" data-act="selMemo" data-id="${m.id}" title="反向連結：這篇筆記的「相關」有寫到目前這篇">← ${esc(m.title || "（無標題）")}</span>`).join("")) : ""
+  ].join("") || `<div class="muted" style="font-size:12px">提示：內文寫 <code>#標籤</code> 或一行 <code>相關：其他筆記標題</code>，這裡就會出現可以點的連結。</div>`;
+}
+
+function viewMemo() {
+  const kb = state.view === "kb";
+  const pool = db.memos.filter(m => !!m.kb === kb);
+  const q = state.memoQ.trim().toLowerCase();
+  const tag = state.memoTag;
+  const list = [...pool]
+    .filter(m => !q || (m.title + " " + m.body).toLowerCase().includes(q))
+    .filter(m => !tag || memoTags(m).includes(tag))
+    .sort((a, b) => b.updated - a.updated);
+  if (!pool.some(m => m.id === state.memoSel)) state.memoSel = list.length ? list[0].id : null;
+  const cur = pool.find(m => m.id === state.memoSel);
+  const tagCount = {};
+  pool.forEach(m => memoTags(m).forEach(t => tagCount[t] = (tagCount[t] || 0) + 1));
+  const allTags = Object.keys(tagCount).sort((a, b) => tagCount[b] - tagCount[a] || a.localeCompare(b));
+
+  return `
+    <h2>${kb ? "知識庫" : "備忘錄"}</h2>
+    <div class="sub-line">${kb ? "ナレッジ ・ 讀書筆記：有出處、用自己的話、互相連結" : "メモ ・ 隨手記，輸入即時儲存"}</div>
+    <div class="split">
+      <div>
+        <div class="row" style="margin-bottom:8px">
+          <input type="search" id="memoQ" class="grow" placeholder="搜尋…" value="${esc(state.memoQ)}">
+          <button class="btn pri" data-act="newMemo">＋</button>
+        </div>
+        ${allTags.length ? `<div class="memo-tags">
+          <span class="chip ${tag ? "" : "on"}" data-act="memoTag" data-tag="">全部</span>
+          ${allTags.map(t => `<span class="chip ${tag === t ? "on" : ""}" data-act="memoTag" data-tag="${esc(t)}">#${esc(t)} ${tagCount[t]}</span>`).join("")}
+        </div>` : ""}
+        <div class="list">
+          ${list.length ? list.map(m => `
+            <div class="item ${m.id === state.memoSel ? "sel" : ""}" data-act="selMemo" data-id="${m.id}">
+              <div class="body">
+                <div class="title">${esc(m.title || "（無標題）")}</div>
+                <div class="sub">${new Date(m.updated).toLocaleDateString("zh-TW")}</div>
+              </div>
+            </div>`).join("") : `<div class="muted">沒有符合的${kb ? "筆記" : "備忘錄"}。</div>`}
+        </div>
+      </div>
+      <div>
+        ${cur ? `
+          <input type="text" id="memoTitle" placeholder="標題" value="${esc(cur.title)}" style="margin-bottom:8px">
+          <div class="md-bar">
+            <span class="chip ${state.memoPreview ? "" : "on"}" data-act="memoMode" data-k="edit">編輯</span>
+            <span class="chip ${state.memoPreview ? "on" : ""}" data-act="memoMode" data-k="preview">預覽</span>
+            ${state.memoPreview || db.settings.memoBar === false ? "" : `
+            <span class="md-sep"></span>
+            <span class="chip" data-act="md" data-k="tpl" title="插入知識筆記範本（可在設定修改）">▤ 範本</span>
+            <span class="chip" data-act="md" data-k="h" title="標題（行首加 ## ）">標題</span>
+            <span class="chip" data-act="md" data-k="b" title="粗體（Ctrl+B）">粗體</span>
+            <span class="chip" data-act="md" data-k="ul" title="項目清單">• 項目</span>
+            <span class="chip" data-act="md" data-k="ol" title="編號清單">1. 編號</span>
+            <span class="chip" data-act="md" data-k="rel" title="連結到其他筆記">→ 相關</span>
+            <span class="chip" data-act="md" data-k="tag" title="加標籤"># 標籤</span>`}
+          </div>
+          <textarea id="memoBody" rows="18" placeholder="${kb ? "內容…（可按上方「▤ 範本」）" : "內容…"}" class="${db.settings.memoBig ? "big" : ""}" style="${state.memoPreview ? "display:none" : ""}">${esc(cur.body)}</textarea>
+          ${state.memoPreview ? `<div class="md-view ${db.settings.memoBig ? "big" : ""}">${mdRender(cur.body) || `<span class="muted">（沒有內容）</span>`}</div>` : ""}
+          <div class="memo-meta" id="memoMeta">${memoMetaHtml(cur)}</div>
+          <div class="row" style="margin-top:8px">
+            <span class="muted grow">最後編輯 ${new Date(cur.updated).toLocaleString("zh-TW")}　·　<span id="memoCount">${charCount(cur.body)}</span> 字</span>
+            <button class="btn sm" data-act="moveMemo" data-id="${cur.id}">${kb ? "▤ 移到備忘錄" : "◈ 移到知識庫"}</button>
+            <button class="btn sm danger" data-act="delMemo" data-id="${cur.id}">刪除</button>
+          </div>` : `<div class="empty">左邊按 ＋ 新增一則${kb ? "知識筆記" : "備忘錄"}。</div>`}
+      </div>
+    </div>`;
+}
+
+/* ================= 待辦 ================= */
+function viewTodo() {
+  const f = state.todoFilter;
+  let list = db.todos.filter(t =>
+    f === "all" ? true : f === "open" ? !t.done : f === "done" ? t.done :
+    f === "today" ? (!t.done && t.due === TODAY()) : (!t.done && t.due && daysFromToday(t.due) < 0));
+  list = list.sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (!!a.due !== !!b.due) return a.due ? -1 : 1;
+    if (a.due && b.due && a.due !== b.due) return a.due < b.due ? -1 : 1;
+    return b.pri - a.pri;
+  });
+  const F = [["open", "未完成"], ["today", "今天"], ["over", "逾期"], ["done", "已完成"], ["all", "全部"]];
+
+  return `
+    <h2>待辦</h2>
+    <div class="sub-line">タスク ・ 關聯技能後，完成會回饋經驗值</div>
+    <div class="row wrap" style="margin-bottom:10px">
+      <input type="text" id="todoText" class="grow" placeholder="要做什麼？">
+      <input type="date" id="todoDue" style="width:150px">
+      <select id="todoSkill" style="width:165px" title="完成後把經驗值加到這個技能">
+        <option value="">不關聯技能</option>
+        ${db.skills.filter(s => skState(s) !== "locked" && s.lv < s.maxLv)
+          .map(s => `<option value="${s.id}">${esc(s.cat)}／${esc(s.name)}</option>`).join("")}
+      </select>
+      <label class="chip" style="cursor:pointer"><input type="checkbox" id="todoPri" style="width:auto;margin-right:5px">重要</label>
+      <button class="btn pri" data-act="addTodo">新增</button>
+    </div>
+    <div class="muted" style="margin-bottom:10px">關聯技能後，勾選完成會自動加經驗值：一般 25 XP、重要 40 XP。取消勾選會收回。</div>
+    <div class="row wrap" style="margin-bottom:10px">
+      ${F.map(([k, n]) => `<span class="chip ${f === k ? "on" : ""}" data-act="todoFilter" data-k="${k}">${n}</span>`).join("")}
+    </div>
+    ${list.length ? list.map(t => {
+      const late = !t.done && t.due && daysFromToday(t.due) < 0;
+      const d = t.due ? daysFromToday(t.due) : null;
+      const when = t.due ? fmtDate(t.due) + (late ? " · 逾期 " + Math.abs(d) + " 天" : d === 0 ? " · 今天" : d === 1 ? " · 明天" : "") : "";
+      return `
+      <div class="item ${t.done ? "done" : ""}">
+        <button class="tick ${t.done ? "on" : ""}" data-act="toggleTodo" data-id="${t.id}">${t.done ? "✓" : ""}</button>
+        <div class="body">
+          <div class="title">${t.pri ? `<span class="tag">重要</span>` : ""}${t.skill && skById(t.skill) ? `<span class="tag">⚔ ${esc(skById(t.skill).name)} +${todoXp(t)}XP</span>` : ""}${esc(t.text)}</div>
+          ${when ? `<div class="sub ${late ? "overdue" : ""}">${when}</div>` : ""}
+        </div>
+        <button class="btn sm danger" data-act="delTodo" data-id="${t.id}">✕</button>
+      </div>`;
+    }).join("") : `<div class="empty">這個分類沒有項目。</div>`}`;
+}
+
+/* ================= 行事曆 ================= */
+function viewCal() {
+  const y = state.calY, m = state.calM;
+  const first = new Date(y, m, 1);
+  const start = new Date(y, m, 1 - first.getDay());
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const s = iso(d);
+    const evs = db.events.filter(e => e.date === s);
+    cells.push(`
+      <div class="day ${d.getMonth() !== m ? "out" : ""} ${s === TODAY() ? "today" : ""} ${s === state.daySel ? "sel" : ""}"
+           data-act="selDay" data-d="${s}">
+        <div class="n">${d.getDate()}</div>
+        <div class="dots">${evs.slice(0, 6).map(e => `<span class="dot${e.skill ? " tr" : e.type === "habit" ? " hb" : ""}${e.done ? " ok" : ""}"></span>`).join("")}</div>
+      </div>`);
+  }
+  const dayEv = db.events.filter(e => e.date === state.daySel).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  const hb = state.schedKind === "habit";
+
+  return `
+    <h2>行事曆</h2>
+    <div class="sub-line">カレンダー ・ 一般行程、技能訓練與日常行動</div>
+    <div class="cal-wrap">
+      <div class="card">
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn sm" data-act="calPrev">◀</button>
+          <span class="grow" style="text-align:center">${y} 年 ${m + 1} 月</span>
+          <button class="btn sm" data-act="calToday">今天</button>
+          <button class="btn sm" data-act="calNext">▶</button>
+        </div>
+        <div class="cal">
+          ${WD.map(d => `<div class="dow">${d}</div>`).join("")}
+          ${cells.join("")}
+        </div>
+      </div>
+      <div class="card cal-day">
+        <div class="card-h"><span class="t">${fmtDate(state.daySel)} 的行程</span>${state.daySel === TODAY() ? "" : `<span class="more" data-act="calToday">回到今天</span>`}</div>
+        <div class="row wrap" style="margin-bottom:10px">
+          <input type="text" id="evTitle" class="grow" placeholder="一般行程名稱">
+          <input type="time" id="evTime" style="width:140px">
+          <button class="btn pri" data-act="addEvent">新增</button>
+        </div>
+        ${dayEv.length ? dayEv.map(e => {
+          const s = e.skill ? skById(e.skill) : null;
+          return `
+          <div class="item ${e.done ? "done" : ""}">
+            ${isPlan(e) ? `<button class="tick ${e.done ? "on" : ""}" data-act="trToggle" data-id="${e.id}" title="標記完成">${e.done ? "✓" : ""}</button>` : ""}
+            <div class="body">
+              <div class="title">${e.time ? `<span class="tag">${esc(e.time)}</span>` : ""}${s ? `<span class="tag">⚔ +${e.xp || 25}XP</span>` : ""}${e.type === "habit" ? `<span class="tag">◇ 日常</span>` : ""}${esc(e.title)}</div>
+              ${s ? `<div class="sub">${esc(s.cat)}／${esc(s.name)}　目前 Lv.${s.lv}/${s.maxLv}${e.done ? "　已完成" : ""}</div>` : ""}
+              ${e.note ? `<div class="sub">${esc(e.note)}</div>` : ""}
+            </div>
+            <button class="btn sm danger" data-act="delEvent" data-id="${e.id}">✕</button>
+          </div>`;
+        }).join("") : `<div class="muted">這天沒有行程。</div>`}
+      </div>
+    </div>
+
+    <h3>排程 <span class="jp">スケジュール</span></h3>
+    <div class="card" style="margin-bottom:14px">
+      <div class="row wrap" style="margin-bottom:10px">
+        <span class="chip ${hb ? "" : "on"}" data-act="schedKind" data-k="train">⚔ 技能訓練</span>
+        <span class="chip ${hb ? "on" : ""}" data-act="schedKind" data-k="habit">◇ 日常行動</span>
+      </div>
+      <div class="row wrap" style="margin-bottom:8px">
+        ${hb ? `<input type="text" id="hbTitle" class="grow" style="min-width:180px" placeholder="要做的行動，例如：早上列今天的待辦" value="${esc(state.habitTitle)}">` : `<select id="trSkill" class="grow" style="min-width:180px">
+          <option value="">選擇要訓練的技能…</option>
+          ${db.skills.filter(s => skState(s) !== "locked" && s.lv < s.maxLv)
+            .map(s => `<option value="${s.id}" ${state.trainSkill === s.id ? "selected" : ""}>${esc(s.cat)}／${esc(s.name)}　Lv.${s.lv}/${s.maxLv}</option>`).join("")}
+        </select>`}
+        <input type="time" id="trTime" value="${esc(state.trainTime)}" style="width:140px">
+      </div>
+      <div class="row wrap" style="margin-bottom:8px">
+        <span class="muted">星期</span>
+        ${WD.map((n, i) => `<span class="chip ${state.trainDays.includes(i) ? "on" : ""}" data-act="trDay" data-d="${i}">${n}</span>`).join("")}
+      </div>
+      <div class="row wrap" style="margin-bottom:8px">
+        <span class="muted">持續</span>
+        ${[1, 2, 4, 8].map(w => `<span class="chip ${state.trainWeeks === w ? "on" : ""}" data-act="trWeeks" data-w="${w}">${w} 週</span>`).join("")}
+        ${hb ? "" : `<span class="muted" style="margin-left:10px">強度</span>
+        ${[["輕度", 15], ["標準", 25], ["深度", 40]].map(([n, x]) =>
+          `<span class="chip ${state.trainXp === x ? "on" : ""}" data-act="trXp" data-x="${x}">${n} ${x}XP</span>`).join("")}`}
+      </div>
+      <div class="row wrap">
+        <button class="btn pri" data-act="trGen">${hb ? "產生行動排程" : "產生訓練排程"}</button>
+        <button class="btn danger" data-act="trClear">${hb ? "清除未完成的日常行動" : "清除未完成的訓練"}</button>
+      </div>
+      <div class="muted" style="margin-top:8px">
+        ${hb ? "把想養成的習慣排進行事曆，例如知識庫筆記裡「我要怎麼用」寫的事。做完就打勾。"
+          : "依技能樹產生行程。完成訓練會自動把經驗值加回該技能——已解鎖且未精通的技能才會出現在清單裡。"}
+      </div>
+    </div>`;
+}
+
+/* ================= 技能樹 ================= */
+const XP_PER_LV = 100;
+
+const skById = id => db.skills.find(s => s.id === id);
+// 前置技能全部達到 Lv.1 以上才解鎖
+const skUnlocked = s => (s.req || []).every(r => (skById(r)?.lv || 0) >= 1);
+function skState(s) {
+  if (s.lv >= s.maxLv) return "master";
+  if (s.lv > 0) return "learning";
+  return skUnlocked(s) ? "ready" : "locked";
+}
+const SK_STATE_TEXT = { master: "已精通", learning: "學習中", ready: "可學習", locked: "未解鎖" };
+
+// 加經驗值，滿了自動升級
+function skAddXp(s, n) {
+  if (s.lv >= s.maxLv) return;
+  s.xp += n;
+  while (s.xp >= XP_PER_LV && s.lv < s.maxLv) { s.xp -= XP_PER_LV; s.lv++; }
+  if (s.lv >= s.maxLv) { s.lv = s.maxLv; s.xp = 0; }
+}
+
+// 扣經驗值（取消完成待辦時用），扣到負的就降級
+function skRemoveXp(s, n) {
+  if (!s) return;
+  s.xp -= n;
+  while (s.xp < 0 && s.lv > 0) { s.lv--; s.xp += XP_PER_LV; }
+  if (s.xp < 0) s.xp = 0;
+}
+
+// 完成待辦給的 XP：重要的給多一點
+const todoXp = t => (t.pri ? 40 : 25);
+
+// 完成訓練行程時同步技能經驗值
+function syncEventXp(e) {
+  if (!e.skill) return e.type === "habit" && e.done ? `完成「${e.title}」，做得好！` : null;
+  const s = skById(e.skill);
+  if (!s) return null;
+
+  if (e.done) {
+    if (!skUnlocked(s)) return `「${s.name}」還沒解鎖，這場訓練沒有計入。`;
+    if (s.lv >= s.maxLv) return `「${s.name}」已經精通了，可以把時間挪去別的技能。`;
+    const before = s.lv;
+    const gain = e.xp || 25;
+    skAddXp(s, gain);
+    e.xpGiven = gain;
+    return s.lv > before
+      ? `訓練完成，${s.name} 升到 Lv.${s.lv} 了！`
+      : `訓練完成，${s.name} +${gain} XP（${s.xp}/${XP_PER_LV}）。`;
+  }
+
+  if (e.xpGiven) {
+    const before = s.lv;
+    skRemoveXp(s, e.xpGiven);
+    const back = e.xpGiven;
+    e.xpGiven = 0;
+    return s.lv < before ? `${s.name} 退回 Lv.${s.lv}。` : `${s.name} 收回 ${back} XP。`;
+  }
+  return null;
+}
+
+// 可以打勾完成的排程：技能訓練或日常行動
+const isPlan = e => !!e.skill || e.type === "habit";
+
+// 依星期幾從今天起往後掃 N 週，回傳日期字串
+function planDates() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const out = [];
+  for (let i = 0; i < state.trainWeeks * 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    if (state.trainDays.includes(d.getDay())) out.push(iso(d));
+  }
+  return out;
+}
+
+// 依名稱與星期產生一批日常行動（不給 XP，單純照表打勾）
+function genHabit() {
+  const title = state.habitTitle.trim();
+  if (!title) { alert("請先寫要做的行動，例如「早上列今天的待辦」。"); return; }
+  if (!state.trainDays.length) { alert("請至少選一個星期幾。"); return; }
+  let made = 0, skipped = 0;
+  planDates().forEach(key => {
+    if (db.events.some(e => e.date === key && e.type === "habit" && e.title === title)) { skipped++; return; }
+    db.events.push({ id: uid(), date: key, time: state.trainTime, title, note: "", done: false, type: "habit" });
+    made++;
+  });
+  save(true);
+  say(made
+    ? `排好 ${made} 次「${title}」${skipped ? `（跳過 ${skipped} 天已排過的）` : ""}。每天打勾就會變成習慣。`
+    : "這些日子都已經排過這個行動了，沒有新增。");
+  render();
+}
+
+// 依技能與星期產生一批訓練行程
+function genTraining() {
+  const s = skById(state.trainSkill);
+  if (!s) { alert("請先選一個要訓練的技能。"); return; }
+  if (!state.trainDays.length) { alert("請至少選一個星期幾。"); return; }
+
+  // 從今天起算 N 週，逐日掃描；這樣「2 週」就真的是往後兩週，
+  // 而不會因為本週的訓練日已經過去而少排幾場
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  let made = 0, skipped = 0;
+  for (let i = 0; i < state.trainWeeks * 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    if (!state.trainDays.includes(d.getDay())) continue;
+    const key = iso(d);
+    if (db.events.some(e => e.date === key && e.skill === s.id)) { skipped++; continue; }
+    db.events.push({
+      id: uid(), date: key, time: state.trainTime, title: `訓練：${s.name}`,
+      note: "", skill: s.id, xp: state.trainXp, done: false, xpGiven: 0, type: "train"
+    });
+    made++;
+  }
+  save(true);
+  say(made
+    ? `排好 ${made} 場「${s.name}」訓練${skipped ? `（跳過 ${skipped} 天已排過的）` : ""}。照表操課就會有進度。`
+    : "這些日子都已經排過訓練了，沒有新增。");
+  render();
+}
+
+// 待辦完成／取消完成時同步技能經驗值，回傳要給 NAVI 播報的訊息
+function syncTodoXp(t) {
+  if (!t.skill) return null;
+  const s = skById(t.skill);
+  if (!s) return null;
+
+  if (t.done) {
+    if (!skUnlocked(s)) return `「${s.name}」還沒解鎖，這次沒有計入經驗值。`;
+    if (s.lv >= s.maxLv) return `「${s.name}」已經精通了，不用再練。`;
+    const before = s.lv;
+    const gain = todoXp(t);
+    skAddXp(s, gain);
+    t.xpGiven = gain;
+    return s.lv > before
+      ? `${s.name} 升到 Lv.${s.lv} 了！這個節奏很好，繼續保持。`
+      : `${s.name} +${gain} XP，目前 ${s.xp}/${XP_PER_LV}。`;
+  }
+
+  if (t.xpGiven) {
+    const before = s.lv;
+    skRemoveXp(s, t.xpGiven);
+    const back = t.xpGiven;
+    t.xpGiven = 0;
+    return s.lv < before
+      ? `${s.name} 退回 Lv.${s.lv}。沒關係，重做一次就好。`
+      : `${s.name} 收回 ${back} XP。`;
+  }
+  return null;
+}
+
+function viewSkill() {
+  const cats = ["全部", ...new Set(db.skills.map(s => s.cat))];
+  const cat = state.skCat || "全部";
+  // 預設把未解鎖的技能收起來，畫面只留現在就能練的
+  const showLocked = !!db.settings.skShowLocked;
+  const list = db.skills.filter(s => (cat === "全部" || s.cat === cat) && (showLocked || skState(s) !== "locked"));
+  const tiers = [...new Set(list.map(s => s.tier))].sort((a, b) => a - b);
+  const cols = cats.slice(1).filter(c => cat === "全部" || c === cat);
+  const sel = state.skSel ? skById(state.skSel) : null;
+
+  const totalLv = db.skills.reduce((a, s) => a + s.lv, 0);
+  const maxTotal = db.skills.reduce((a, s) => a + s.maxLv, 0);
+  const mastered = db.skills.filter(s => s.lv >= s.maxLv).length;
+  const ready = db.skills.filter(s => skState(s) === "ready").length;
+
+  // 同一欄裡，每一層依前置技能的位置排序，讓連線盡量直、不交叉
+  const order = {};
+  const grid = {};
+  cols.forEach(c => tiers.forEach(t => {
+    const row = list.filter(s => s.cat === c && s.tier === t);
+    const key = s => {
+      const ps = (s.req || []).map(r => order[r]).filter(v => v !== undefined);
+      return ps.length ? ps.reduce((x, y) => x + y, 0) / ps.length : 99;
+    };
+    row.sort((x, y) => key(x) - key(y));
+    row.forEach((s, i) => { order[s.id] = i; });
+    grid[c + "|" + t] = row;
+  }));
+  const node = s => {
+    const st = skState(s);
+    const pct = s.lv >= s.maxLv ? 100 : Math.round(s.xp / XP_PER_LV * 100);
+    return `<div class="sk-node ${st} ${state.skSel === s.id ? "sel" : ""}" data-sk="${s.id}" data-act="skPick" data-id="${s.id}" title="${esc(s.desc || s.name)}">
+      <div class="sk-name">${esc(s.name)}</div>
+      <div class="sk-lv"><span>${st === "locked" ? "🔒 未解鎖" : SK_STATE_TEXT[st]}</span><b>Lv.${s.lv}/${s.maxLv}</b></div>
+      <div class="sk-bar"><i style="width:${pct}%"></i></div>
+    </div>`;
+  };
+  const nodes = cols.map(c => {
+    const cs = db.skills.filter(s => s.cat === c);
+    const lv = cs.reduce((x, s) => x + s.lv, 0), mx = cs.reduce((x, s) => x + s.maxLv, 0);
+    const vis = list.filter(s => s.cat === c);
+    const ts = tiers.filter(t => vis.length && t <= Math.max(...vis.map(s => s.tier)));
+    const hidden = cs.length - vis.length;
+    return `<div class="sk-col">
+      <div class="sk-head"><b>${esc(c)}</b><span class="muted">${cs.length} 項 ・ ${mx ? Math.round(lv / mx * 100) : 0}%</span></div>
+      ${ts.map(t => `<div class="sk-tier-row"><span class="sk-tlbl">T${t}</span><div class="sk-cell">${grid[c + "|" + t].map(node).join("")}</div></div>`).join("")}
+      ${hidden ? `<span class="muted sk-more" data-act="skLocked">🔒 還有 ${hidden} 個未解鎖</span>` : ""}
+    </div>`;
+  }).join("");
+
+  return `
+    <h2>技能樹</h2>
+    <div class="sub-line">スキルツリー ・ 前置技能達 Lv.1 解鎖後續</div>
+    <div class="sk-stat">
+      <span>總等級 <b>${totalLv}</b> / ${maxTotal}</span>
+      <span>已精通 <b>${mastered}</b> / ${db.skills.length}</span>
+      <span>可學習 <b>${ready}</b></span>
+      <span>完成度 <b>${Math.round(totalLv / maxTotal * 100)}</b>%</span>
+    </div>
+    <div class="row wrap" style="margin-bottom:14px">
+      ${cats.map(c => `<span class="chip ${cat === c ? "on" : ""}" data-act="skCat" data-c="${esc(c)}">${esc(c)}</span>`).join("")}
+      <span class="chip" data-act="skNew">＋ 新增技能</span>
+      <span class="chip ${showLocked ? "on" : ""}" data-act="skLocked" title="未解鎖的技能要不要顯示">${showLocked ? "隱藏未解鎖" : "顯示未解鎖"}</span>
+    </div>
+
+    ${sel ? (() => {
+      const st = skState(sel);
+      const reqNames = (sel.req || []).map(r => {
+        const p = skById(r);
+        return p ? `${esc(p.name)}${(p.lv || 0) >= 1 ? " ✓" : " ✗"}` : r;
+      });
+      return `<div class="sk-detail">
+        <div class="row wrap" style="margin-bottom:8px">
+          <span class="grow" style="font-size:14px">${esc(sel.name)}　<span class="muted">${SK_STATE_TEXT[st]} ・ Lv.${sel.lv}/${sel.maxLv}${sel.lv < sel.maxLv ? ` ・ XP ${sel.xp}/${XP_PER_LV}` : ""}</span></span>
+          <button class="btn sm danger" data-act="skDel" data-id="${sel.id}">刪除</button>
+        </div>
+        <div class="sk-desc">${sel.desc ? esc(sel.desc) : `<span class="muted">還沒有簡介。</span>`}</div>
+        <div class="row" style="margin:6px 0 10px">
+          <span class="chip" data-act="skEditDesc" data-id="${sel.id}">${state.skEditDesc === sel.id ? "收起簡介編輯" : "✎ 編輯簡介"}</span>
+        </div>
+        ${state.skEditDesc === sel.id
+          ? `<textarea id="skDesc" rows="4" placeholder="這個技能是什麼、學到什麼程度算數、為什麼值得練…" style="margin-bottom:10px">${esc(sel.desc || "")}</textarea>`
+          : ""}
+        ${reqNames.length ? `<div class="muted" style="margin-bottom:8px">前置：${reqNames.join("　")}</div>` : ""}
+        ${(() => {
+          const rel = db.todos.filter(t => t.skill === sel.id);
+          if (!rel.length) return `<div class="muted" style="margin-bottom:8px">還沒有待辦關聯到這個技能。到「待辦」新增時選它，完成就會自動加 XP。</div>`;
+          const open = rel.filter(t => !t.done).length;
+          return `<div class="muted" style="margin-bottom:8px">關聯待辦 ${rel.length} 件（未完成 ${open}）：${rel.slice(0, 4).map(t => `${t.done ? "✓" : "○"} ${esc(t.text)}`).join("　")}</div>`;
+        })()}
+        ${(() => {
+          const tr = db.events.filter(e => e.skill === sel.id).sort((a, b) => a.date.localeCompare(b.date));
+          if (!tr.length) return `<div class="muted" style="margin-bottom:8px">還沒排訓練。到「行事曆」的訓練排程可以依這個技能產生行程。</div>`;
+          const done = tr.filter(e => e.done).length;
+          const next = tr.find(e => !e.done && e.date >= TODAY());
+          return `<div class="muted" style="margin-bottom:8px">訓練 ${done}/${tr.length} 場完成${next ? `　下一場：${fmtDate(next.date)} ${esc(next.time || "")}` : "　全部完成了"}</div>`;
+        })()}
+        ${st === "locked"
+          ? `<div class="wx-err">前置技能還沒達到 Lv.1，先去點亮它們。</div>`
+          : `<div class="row wrap" style="margin-bottom:10px">
+              <button class="btn" data-act="skXp" data-id="${sel.id}" data-n="10">+10 XP</button>
+              <button class="btn" data-act="skXp" data-id="${sel.id}" data-n="25">+25 XP</button>
+              <button class="btn pri" data-act="skLv" data-id="${sel.id}" data-n="1">直接升 1 級</button>
+              <button class="btn sm" data-act="skLv" data-id="${sel.id}" data-n="-1">降 1 級</button>
+            </div>`}
+        <div class="muted" style="font-size:10px; letter-spacing:.2em; margin-bottom:4px">學習筆記</div>
+        <textarea id="skNote" rows="3" placeholder="資源連結、卡住的地方、今天練到哪…">${esc(sel.note || "")}</textarea>
+      </div>`;
+    })() : `<div class="muted" style="margin-bottom:10px">點一個節點看詳情、加經驗值。前置技能達到 Lv.1 才會解鎖後續。</div>`}
+
+    <div class="sk-scroll" style="margin-top:16px">
+      <div class="sk-wrap" id="skWrap">
+        <svg class="sk-lines" id="skLines"></svg>
+        ${nodes}
+      </div>
+    </div>`;
+}
+
+// 依實際版面位置畫出前置關係連線
+function drawSkillLines() {
+  const wrap = document.getElementById("skWrap");
+  const svg = document.getElementById("skLines");
+  if (!wrap || !svg || typeof wrap.getBoundingClientRect !== "function" || !wrap.querySelectorAll) return;
+  const W = wrap.getBoundingClientRect();
+  if (!W.width) return;
+  const pos = {};
+  wrap.querySelectorAll("[data-sk]").forEach(n => {
+    const r = n.getBoundingClientRect();
+    pos[n.dataset.sk] = { x: r.left - W.left + r.width / 2, top: r.top - W.top, bot: r.top - W.top + r.height };
+  });
+  let d = "";
+  for (const s of db.skills) {
+    for (const rq of s.req || []) {
+      const a = pos[rq], b = pos[s.id];
+      if (!a || !b) continue;
+      const done = (skById(rq)?.lv || 0) >= 1;
+      const mid = (a.bot + b.top) / 2;
+      d += `<path d="M${a.x} ${a.bot} C ${a.x} ${mid}, ${b.x} ${mid}, ${b.x} ${b.top}"
+             fill="none" stroke="${done ? "var(--accent2)" : "var(--dim)"}" stroke-opacity="${done ? 1 : .45}" stroke-width="${done ? 1.6 : 1.2}"/>
+            <circle cx="${b.x}" cy="${b.top}" r="2.2" fill="${done ? "var(--accent2)" : "var(--dim)"}"/>`;
+    }
+  }
+  svg.setAttribute("width", W.width);
+  svg.setAttribute("height", W.height);
+  svg.innerHTML = d;
+}
+
+// 視窗大小改變時技能欄可能換行，連線要跟著重畫
+let skResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(skResizeTimer);
+  skResizeTimer = setTimeout(() => { if (state.view === "skill") drawSkillLines(); }, 120);
+});
+
+/* ================= 分頁收藏 ================= */
+function viewLink() {
+  const cats = ["全部", ...new Set(db.links.map(l => l.cat).filter(Boolean))];
+  const q = state.linkQ.trim().toLowerCase();
+  const list = db.links.filter(l =>
+    (state.linkCat === "全部" || l.cat === state.linkCat) &&
+    (!q || (l.title + " " + l.url).toLowerCase().includes(q)));
+
+  return `
+    <h2>分頁收藏</h2>
+    <div class="sub-line">リンク ・ 可匯入瀏覽器書籤 HTML</div>
+    <div class="row wrap" style="margin-bottom:10px">
+      <input type="search" id="linkQ" class="grow" placeholder="搜尋標題或網址…" value="${esc(state.linkQ)}">
+      <button class="btn sm" data-act="pickBookmarks">匯入書籤 HTML</button>
+    </div>
+    <div class="row wrap" style="margin-bottom:10px">
+      ${cats.map(c => `<span class="chip ${state.linkCat === c ? "on" : ""}" data-act="linkCat" data-c="${esc(c)}">${esc(c)}</span>`).join("")}
+    </div>
+    <div class="row wrap" style="margin-bottom:12px">
+      <input type="text" id="lkTitle" class="grow" placeholder="標題">
+      <input type="text" id="lkUrl" class="grow" placeholder="https://">
+      <input type="text" id="lkCat" style="width:110px" placeholder="分類">
+      <button class="btn pri" data-act="addLink">新增</button>
+    </div>
+    <div class="muted" style="margin-bottom:8px">共 ${list.length} 筆</div>
+    ${list.length ? list.map(l => `
+      <div class="item ${l.read ? "done" : ""}">
+        <button class="tick ${l.read ? "on" : ""}" data-act="toggleLink" data-id="${l.id}" title="標記已看">${l.read ? "✓" : ""}</button>
+        <div class="body">
+          <div class="title">${l.cat ? `<span class="tag">${esc(l.cat)}</span>` : ""}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a></div>
+          <div class="sub">${esc(l.url)}</div>
+        </div>
+        <button class="btn sm danger" data-act="delLink" data-id="${l.id}">✕</button>
+      </div>`).join("") : `<div class="empty">沒有符合的連結。</div>`}
+    <input type="file" id="bmFile" accept=".html,.htm" style="display:none">`;
+}
+
+/* ================= 設定 ================= */
+function viewSet() {
+  const bytes = new Blob([JSON.stringify(db)]).size;
+  const THEMES = [["green", "磷光綠"], ["amber", "琥珀"], ["blue", "冷藍"], ["paper", "紙白"]];
+  const p = db.settings.place || {};
+
+  return `
+    <h2>設定</h2>
+    <div class="sub-line">セッティング ・ 外觀、個人化、地點與資料備份</div>
+
+    <div class="set-wrap">
+
+      <div class="card">
+        <div class="card-h"><span class="t">外觀</span></div>
+        <div class="set-row">
+          <div class="lbl">主題<div class="hint">四種配色，隨時可換</div></div>
+          <div class="ctl row wrap">
+            ${THEMES.map(([k, n]) => `<span class="chip ${db.settings.theme === k ? "on" : ""}" data-act="theme" data-k="${k}">${n}</span>`).join("")}
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">稱呼<div class="hint">首頁問候語怎麼叫你</div></div>
+          <div class="ctl row">
+            <input type="text" id="userName" class="grow" style="max-width:220px" placeholder="你的名字" value="${esc(db.settings.userName || "")}">
+            <button class="btn" data-act="setName">套用</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">角色 <span class="jp">キャラクター</span></span></div>
+        <div class="set-row">
+          <div class="lbl">顯示<div class="hint">側欄立繪與開機動畫</div></div>
+          <div class="ctl row wrap">
+            <span class="chip ${db.settings.chara ? "on" : ""}" data-act="toggleChara">立繪：${db.settings.chara ? "顯示" : "隱藏"}</span>
+            <span class="chip ${db.settings.boot ? "on" : ""}" data-act="toggleBoot">開機動畫：${db.settings.boot ? "開" : "關"}</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">立繪檔案<div class="hint">放在 pda.html 同一層</div></div>
+          <div class="ctl row">
+            <input type="text" id="avatarPath" class="grow" style="max-width:260px" placeholder="個人助理.jpg" value="${esc(db.settings.avatar || "")}">
+            <button class="btn" data-act="setAvatar">套用</button>
+          </div>
+        </div>
+        <div class="set-note">
+          建議直式人物圖，會裁切填滿側欄方框。找不到檔案時顯示預設剪影。
+          視窗小於 1100px 時立繪會轉為半透明背景襯底。
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">備忘錄／知識庫 <span class="jp">メモ</span></span></div>
+        <div class="set-row">
+          <div class="lbl">編輯器<div class="hint">字體大小與工具列</div></div>
+          <div class="ctl row wrap">
+            <span class="chip ${db.settings.memoBig ? "on" : ""}" data-act="setMemoBig">大字模式：${db.settings.memoBig ? "開" : "關"}</span>
+            <span class="chip ${db.settings.memoBar !== false ? "on" : ""}" data-act="setMemoBar">工具列：${db.settings.memoBar !== false ? "顯示" : "隱藏"}</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">開啟筆記時<div class="hint">預設進入的模式</div></div>
+          <div class="ctl row wrap">
+            <span class="chip ${db.settings.memoMode !== "preview" ? "on" : ""}" data-act="setMemoMode" data-k="edit">編輯</span>
+            <span class="chip ${db.settings.memoMode === "preview" ? "on" : ""}" data-act="setMemoMode" data-k="preview">預覽</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">筆記範本<div class="hint">工具列「▤ 範本」插入的內容</div></div>
+          <div class="ctl">
+            <textarea id="memoTplIn" rows="9">${esc(db.settings.memoTpl || DEFAULT_MEMO_TPL)}</textarea>
+            <div class="row" style="margin-top:8px">
+              <button class="btn pri" data-act="setMemoTpl">套用</button>
+              <button class="btn" data-act="resetMemoTpl">還原預設</button>
+            </div>
+          </div>
+        </div>
+        <div class="set-note">
+          範本裡的 <code>{出處}</code> 會自動換成上一篇筆記的出處（頁碼留空）。
+          編輯時可用 Ctrl+B 粗體、Tab 縮排；在「• 」或「1. 」那行按 Enter 會自動接續清單。
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">天氣與地點 <span class="jp">てんき</span></span></div>
+        <div class="set-row">
+          <div class="lbl">右側資訊欄<div class="hint">天氣、今日訓練、技能進度</div></div>
+          <div class="ctl row wrap">
+            <span class="chip ${db.settings.wx ? "on" : ""}" data-act="toggleWx">${db.settings.wx ? "顯示" : "隱藏"}</span>
+            <span class="chip" data-act="wxRefresh2">↻ 立即更新天氣</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">目前地點</div>
+          <div class="ctl">
+            <div style="font-size:14px">${esc(p.name || "未設定")}</div>
+            <div class="muted" style="margin-top:3px; line-height:1.6">
+              ${esc(p.addr || "")}${p.lat != null ? `<br>${(+p.lat).toFixed(4)}, ${(+p.lon).toFixed(4)}` : ""}
+              ${p.how ? `<br><span style="color:var(--accent2)">${esc(p.how)}</span>` : ""}
+            </div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">重新定位<div class="hint">三種方式，精度與隱私不同</div></div>
+          <div class="ctl">
+            <div class="row wrap" style="margin-bottom:8px">
+              <button class="btn pri" data-act="locGPS">📍 瀏覽器定位</button>
+              <button class="btn" data-act="locIP">🌐 IP 定位</button>
+            </div>
+            <div class="row">
+              <input type="text" id="geoQ" class="grow" style="max-width:260px" placeholder="或手動搜尋：彰化、員林、Tokyo…">
+              <button class="btn" data-act="geoGo">搜尋</button>
+            </div>
+            ${state.geoBusy ? `<div class="muted" style="margin-top:8px">搜尋中…</div>` : ""}
+            ${state.geoErr ? `<div class="wx-err" style="margin-top:8px">${esc(state.geoErr)}</div>` : ""}
+            ${state.geoResults.length ? `<div style="margin-top:8px">${state.geoResults.map((g, i) => `
+              <div class="item geo-hit" data-act="geoPick" data-i="${i}">
+                <div class="body">
+                  <div class="title">${esc(g.name)}</div>
+                  <div class="sub">${esc([g.country, g.admin1, g.admin2].filter(Boolean).join(" "))}　${g.latitude.toFixed(3)}, ${g.longitude.toFixed(3)}</div>
+                </div>
+              </div>`).join("")}</div>` : ""}
+          </div>
+        </div>
+        <div class="set-note">
+          <b>瀏覽器定位</b>：GPS／WiFi，會跳出授權詢問，座標送 OpenStreetMap Nominatim 反查地址。
+          <b>IP 定位</b>：免授權，城市級精度，抓到的是 ISP 位置。
+          <b>手動搜尋</b>：完全不洩漏位置。
+          天氣來自 Open-Meteo，每 30 分鐘更新，三項服務皆免金鑰。地址只存在本機。
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">雲端同步 <span class="jp">シンク</span></span></div>
+        ${sync.token ? `
+        <div class="set-row">
+          <div class="lbl">狀態<div class="hint">存在 GitHub 私人 Gist</div></div>
+          <div class="ctl">
+            <div>${syncBusy ? "同步中…" : sync.err ? `<span style="color:var(--danger)">${esc(sync.err)}</span>` : sync.lastSync ? "已同步" : "尚未同步"}</div>
+            <div class="muted" style="margin-top:4px">上次同步：${sync.lastSync ? new Date(sync.lastSync).toLocaleString("zh-TW") : "—"}${sync.gistId ? `　·　<a href="https://gist.github.com/${esc(sync.gistId)}" target="_blank" rel="noopener">在 GitHub 查看</a>` : ""}</div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">操作<div class="hint">打開、切回分頁時自動下載；修改後約 5 秒自動上傳</div></div>
+          <div class="ctl row wrap">
+            <button class="btn pri" data-act="syncNow">立即同步</button>
+            <button class="btn" data-act="syncOff">中斷連線</button>
+          </div>
+        </div>` : `
+        <div class="set-row">
+          <div class="lbl">GitHub Token<div class="hint">手機、電腦貼同一個 Token 就會同步</div></div>
+          <div class="ctl row wrap">
+            <input type="password" id="syncToken" class="grow" placeholder="github_pat_… 或 ghp_…" autocomplete="off">
+            <button class="btn pri" data-act="syncOn">連線</button>
+          </div>
+        </div>
+        <div class="set-note">
+          建立方式：GitHub →
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Fine-grained token</a>
+          → Permissions 只開 <b>Gists：Read and write</b>。Token 只存在這台瀏覽器，不會跟著匯出 JSON。
+          資料存成你帳號底下的<b>私人 Gist</b>，Gist 會保留每次修改的歷史版本。
+        </div>`}
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">資料</span></div>
+        <div class="set-row">
+          <div class="lbl">目前存量</div>
+          <div class="ctl">
+            <span class="big" style="font-size:22px">${(bytes / 1024).toFixed(1)} KB</span>
+            <span class="muted">／ 約 5 MB（已用 ${Math.max(0.1, bytes / (5 * 1024 * 1024) * 100).toFixed(1)}%）</span>
+            <div class="bar" style="margin-top:6px" title="瀏覽器 localStorage 上限以 5 MB 保守估計"><i style="width:${Math.min(100, bytes / (5 * 1024 * 1024) * 100)}%"></i></div>
+            <div class="muted" style="margin-top:4px">
+              備忘錄 ${db.memos.filter(m => !m.kb).length}｜知識庫 ${db.memos.filter(m => m.kb).length}｜待辦 ${db.todos.length}｜行程 ${db.events.length}｜連結 ${db.links.length}｜技能 ${db.skills.length}
+            </div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">備份<div class="hint">清瀏覽資料會一併清掉，請定期匯出</div>
+            <div class="hint" ${(backupAge() ?? Infinity) >= BACKUP_DAYS ? `style="color:var(--accent2)"` : ""}>${backupAge() === null ? "還沒有匯出過" : `上次匯出：${backupAge() === 0 ? "今天" : backupAge() + " 天前"}`}</div></div>
+          <div class="ctl row wrap">
+            <button class="btn pri" data-act="export">匯出 JSON</button>
+            <button class="btn" data-act="pickImport">匯入 JSON</button>
+            <button class="btn" data-act="exportMd">匯出 Markdown</button>
+            <button class="btn" data-act="showDump">在畫面上顯示</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">自動備份<div class="hint">匯入、清除、還原前自動存的，最多 ${SNAP_MAX} 份</div></div>
+          <div class="ctl">
+            ${(() => {
+              const sn = loadSnaps();
+              if (!sn.length) return `<span class="muted">還沒有。匯入或清除資料前會自動備份。</span>`;
+              return sn.map((x, i) => {
+                let memo = "";
+                try { const d = JSON.parse(x.data); memo = `筆記 ${(d.memos || []).length}｜待辦 ${(d.todos || []).length}｜行程 ${(d.events || []).length}`; } catch (e) { memo = "（資料損毀）"; }
+                return `<div class="row wrap" style="margin-bottom:6px">
+                  <span class="grow">${new Date(x.at).toLocaleString("zh-TW")}　<span class="tag">${esc(x.reason)}</span>　<span class="muted">${memo}</span></span>
+                  <button class="btn sm" data-act="snapDownload" data-i="${i}">下載</button>
+                  <button class="btn sm" data-act="snapRestore" data-i="${i}">還原</button>
+                </div>`;
+              }).join("");
+            })()}
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lbl">危險操作</div>
+          <div class="ctl"><button class="btn danger" data-act="wipe">清除全部資料</button></div>
+        </div>
+        <input type="file" id="jsonFile" accept=".json" style="display:none">
+        ${state.dump ? `
+          <div style="margin-top:12px">
+            <div class="row" style="margin-bottom:6px">
+              <span class="grow muted">${esc(state.dump.name)}　全選複製後貼到文字檔即可</span>
+              <button class="btn sm" data-act="closeDump">關閉</button>
+            </div>
+            <textarea rows="10" readonly onclick="this.select()">${esc(state.dump.text)}</textarea>
+          </div>` : ""}
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="t">關於</span></div>
+        <div class="set-note" style="margin-top:0">
+          單檔 HTML，沒有相依套件、沒有建置流程。只連天氣服務，以及開啟雲端同步時的 GitHub。
+          要改功能或外觀，用編輯器打開 <code>pda.html</code> 直接改。
+          <br>Alt+1 ~ Alt+8 切換模組。資料存在瀏覽器 localStorage。
+        </div>
+      </div>
+
+    </div>`;
+}
+
+/* ================= 事件 ================= */
+function wire() {
+  const v = $("#view");
+
+  v.onclick = e => {
+    const el = e.target.closest("[data-act],[data-go]");
+    if (!el) return;
+    const act = el.dataset.act, id = el.dataset.id;
+
+    switch (act) {
+      case "focusQuick": { const q = $("#quickTodo"); if (q) q.focus(); break; }
+      case "quickAdd": {
+        const i = $("#quickTodo");
+        if (i.value.trim()) { db.todos.push({ id: uid(), text: i.value.trim(), due: "", pri: 0, done: false, created: Date.now() }); save(true); state.focus = "#quickTodo"; render(); }
+        break;
+      }
+      case "openMemo":
+      case "selMemo": { const m = db.memos.find(x => x.id === id); if (m) showMemo(m); break; }
+      case "newMemo": {
+        const kb = (el.dataset.go || state.view) === "kb";
+        const m = { id: uid(), title: "", body: "", kb, updated: Date.now() };
+        db.memos.unshift(m); state.memoSel = m.id; state.memoQ = ""; state.memoPreview = false; save(true);
+        state.focus = "#memoTitle"; render(); break;
+      }
+      case "memoTag": state.memoTag = el.dataset.tag || ""; render(); break;
+      case "md": mdAction(el.dataset.k); break;
+      case "memoMode": state.memoPreview = el.dataset.k === "preview"; if (!state.memoPreview) state.focus = "#memoBody"; render(); break;
+      case "setMemoBig": db.settings.memoBig = !db.settings.memoBig; save(true); render(); break;
+      case "setMemoBar": db.settings.memoBar = db.settings.memoBar === false; save(true); render(); break;
+      case "setMemoMode": db.settings.memoMode = el.dataset.k; state.memoPreview = el.dataset.k === "preview"; save(true); render(); break;
+      case "setMemoTpl": db.settings.memoTpl = $("#memoTplIn").value; save(true); render(); say("筆記範本已更新。"); break;
+      case "resetMemoTpl": db.settings.memoTpl = ""; save(true); render(); break;
+      case "newMemoTitled": {
+        const m = { id: uid(), title: el.dataset.title, body: "", kb: state.view === "kb", updated: Date.now() };
+        db.memos.unshift(m); state.memoSel = m.id; state.memoQ = ""; state.memoTag = ""; state.memoPreview = false; save(true);
+        state.focus = "#memoBody"; render(); break;
+      }
+      case "moveMemo": {
+        const m = db.memos.find(x => x.id === id);
+        if (!m) break;
+        m.kb = !m.kb; save(true); render(); say(`已移到${m.kb ? "知識庫" : "備忘錄"}。`);
+        break;
+      }
+      case "delMemo":
+        if (confirm("刪除這則筆記？")) {
+          db.memos = db.memos.filter(m => m.id !== id);
+          state.memoSel = null; save(true); render();
+        }
+        break;
+      case "addTodo": {
+        const t = $("#todoText");
+        if (!t.value.trim()) { t.focus(); break; }
+        db.todos.push({
+          id: uid(), text: t.value.trim(), due: $("#todoDue").value,
+          pri: $("#todoPri").checked ? 1 : 0, skill: $("#todoSkill")?.value || "",
+          done: false, xpGiven: 0, created: Date.now()
+        });
+        save(true); state.focus = "#todoText"; render(); break;
+      }
+      case "toggleTodo": {
+        const t = db.todos.find(x => x.id === id);
+        if (t) {
+          t.done = !t.done;
+          t.doneAt = t.done ? Date.now() : null;   // 首頁「今日待辦」靠這個算今天完成幾件
+          say(syncTodoXp(t));          // 完成／取消完成時同步技能經驗值
+          save(true); render();
+        }
+        break;
+      }
+      case "delTodo": db.todos = db.todos.filter(x => x.id !== id); save(true); render(); break;
+      case "todoFilter": state.todoFilter = el.dataset.k; render(); break;
+
+      case "calPrev": state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; } render(); break;
+      case "calNext": state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; } render(); break;
+      case "calToday": { const d = new Date(); state.calY = d.getFullYear(); state.calM = d.getMonth(); state.daySel = TODAY(); render(); break; }
+      case "selDay": state.daySel = el.dataset.d; render(); break;
+      case "addEvent": {
+        const t = $("#evTitle");
+        if (!t.value.trim()) { t.focus(); break; }
+        db.events.push({ id: uid(), date: state.daySel, time: $("#evTime").value, title: t.value.trim(), note: "" });
+        save(true); state.focus = "#evTitle"; render(); break;
+      }
+      case "delEvent": {
+        const e2 = db.events.find(x => x.id === id);
+        if (e2 && e2.done && e2.xpGiven) skRemoveXp(skById(e2.skill), e2.xpGiven);  // 刪掉已完成的訓練要收回 XP
+        db.events = db.events.filter(x => x.id !== id);
+        save(true); render(); break;
+      }
+      case "trDay": {
+        const d = +el.dataset.d;
+        state.trainDays = state.trainDays.includes(d)
+          ? state.trainDays.filter(x => x !== d) : [...state.trainDays, d].sort();
+        render(); break;
+      }
+      case "trWeeks": state.trainWeeks = +el.dataset.w; render(); break;
+      case "trXp": state.trainXp = +el.dataset.x; render(); break;
+      case "schedKind": state.schedKind = el.dataset.k; render(); break;
+      case "trGen": {
+        state.trainTime = $("#trTime")?.value || "20:00";
+        if (state.schedKind === "habit") { state.habitTitle = $("#hbTitle")?.value || ""; genHabit(); }
+        else { state.trainSkill = $("#trSkill")?.value || ""; genTraining(); }
+        break;
+      }
+      case "trToggle": {
+        const e2 = db.events.find(x => x.id === id);
+        if (e2) { e2.done = !e2.done; say(syncEventXp(e2)); save(true); render(); }
+        break;
+      }
+      case "trClear": {
+        const hb = state.schedKind === "habit";
+        const hit = e2 => !e2.done && (hb ? e2.type === "habit" : !!e2.skill);
+        const n = db.events.filter(hit).length;
+        const what = hb ? "日常行動" : "訓練行程";
+        if (!n) { alert(`沒有未完成的${what}。`); break; }
+        if (confirm(`清除 ${n} 個未完成的${what}？已完成的會保留。`)) {
+          db.events = db.events.filter(e2 => !hit(e2));
+          save(true); render();
+        }
+        break;
+      }
+
+      case "skPick": {
+        const s = skById(id);
+        if (!s) break;
+        state.skSel = state.skSel === id ? null : id;
+        render(); break;
+      }
+      case "skCat": state.skCat = el.dataset.c; render(); break;
+      case "skLocked": db.settings.skShowLocked = !db.settings.skShowLocked; save(true); render(); break;
+      case "skEditDesc": state.skEditDesc = state.skEditDesc === id ? null : id; render(); break;
+      case "skXp": {
+        const s = skById(id);
+        if (s && skUnlocked(s)) { skAddXp(s, +el.dataset.n); save(true); render(); }
+        break;
+      }
+      case "skLv": {
+        const s = skById(id);
+        if (!s || !skUnlocked(s)) break;
+        const n = +el.dataset.n;
+        s.lv = Math.max(0, Math.min(s.maxLv, s.lv + n));
+        s.xp = 0;
+        save(true); render(); break;
+      }
+      case "skDel":
+        if (confirm(`刪除技能「${skById(id)?.name}」？依賴它的技能會失去這個前置。`)) {
+          db.skills = db.skills.filter(s => s.id !== id);
+          db.skills.forEach(s => { s.req = (s.req || []).filter(r => r !== id); });
+          db.todos.forEach(t => { if (t.skill === id) { t.skill = ""; t.xpGiven = 0; } });
+          state.skSel = null; save(true); render();
+        }
+        break;
+      case "skNew": {
+        const name = prompt("技能名稱？");
+        if (!name || !name.trim()) break;
+        const cat = prompt("分類？（例如：專注力、閱讀、健康）", state.skCat === "全部" ? "專注力" : state.skCat) || "未分類";
+        const tier = parseInt(prompt("階層？（0 是最底層，數字越大越後面）", "0"), 10) || 0;
+        const maxLv = parseInt(prompt("最大等級？", "5"), 10) || 5;
+        const desc = prompt("簡介？（這個技能是什麼、學到什麼程度算數。可留空之後再補）", "") || "";
+        const s = { id: uid(), name: name.trim(), cat: cat.trim(), tier, req: [], maxLv, desc: desc.trim(), descV: 2, lv: 0, xp: 0, note: "" };
+        db.skills.push(s);
+        state.skSel = s.id; state.skCat = "全部";
+        save(true); render(); break;
+      }
+
+      case "linkCat": state.linkCat = el.dataset.c; render(); break;
+      case "addLink": {
+        const t = $("#lkTitle"), u = $("#lkUrl");
+        if (!u.value.trim()) { u.focus(); break; }
+        let url = u.value.trim();
+        if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+        db.links.unshift({ id: uid(), title: t.value.trim() || url, url, cat: $("#lkCat").value.trim() || "未分類", tags: [], read: false });
+        save(true); state.focus = "#lkTitle"; render(); break;
+      }
+      case "toggleLink": { const l = db.links.find(x => x.id === id); if (l) { l.read = !l.read; save(true); render(); } break; }
+      case "delLink": db.links = db.links.filter(x => x.id !== id); save(true); render(); break;
+      case "pickBookmarks": $("#bmFile").click(); break;
+
+      case "theme": db.settings.theme = el.dataset.k; save(true); render(); break;
+      case "toggleChara": db.settings.chara = !db.settings.chara; save(true); render(); break;
+      case "toggleBoot": db.settings.boot = !db.settings.boot; save(true); render(); break;
+      case "setAvatar": db.settings.avatar = $("#avatarPath").value.trim() || DEFAULT_AVATAR; save(true); render(); break;
+      case "setName": db.settings.userName = $("#userName").value.trim() || "你"; save(true); render(); break;
+      case "toggleWx": db.settings.wx = !db.settings.wx; save(true); render(); break;
+      case "wxRefresh2": fetchWeather(true); break;
+      case "locGPS": locateGPS(); break;
+      case "locIP": locateIP(); break;
+      case "geoGo": {
+        const q = $("#geoQ").value.trim();
+        if (q) geoSearch(q);
+        break;
+      }
+      case "geoPick": {
+        const g = state.geoResults[+el.dataset.i];
+        if (!g) break;
+        db.settings.place = {
+          name: g.name,
+          addr: [g.country, g.admin1, g.admin2].filter(Boolean).join(" "),
+          lat: g.latitude, lon: g.longitude
+        };
+        state.geoResults = []; state.geoErr = null;
+        db.cache.wx = null; db.cache.at = 0;
+        save(true); render(); fetchWeather(true);
+        break;
+      }
+      case "export": {
+        // 先記下匯出時間再存檔，檔名帶時分，同一天多次匯出不會變成 (1)、(2)
+        const t = new Date();
+        db.settings.lastExport = t.getTime();
+        save(true);
+        const hm = String(t.getHours()).padStart(2, "0") + String(t.getMinutes()).padStart(2, "0");
+        download(`pda-backup-${TODAY()}_${hm}.json`, JSON.stringify(db, null, 2), "application/json");
+        render();
+        break;
+      }
+      case "syncOn": {
+        const t = $("#syncToken").value.trim();
+        if (!t) break;
+        sync = { ...loadSync(), token: t, gistId: "", remoteAt: null, hash: "", err: "" };
+        saveSync(); render(); syncNow(true);
+        break;
+      }
+      case "syncNow": syncNow(true); break;
+      case "syncOff":
+        if (!confirm("中斷雲端同步？\n這台的資料會保留，雲端的 Gist 也不會刪除，之後貼上 Token 可以再連回來。")) break;
+        sync = { ...loadSync(), token: "", gistId: "", remoteAt: null, hash: "", err: "" };
+        saveSync(); showSync(); render();
+        break;
+      case "exportMd": download("pda-" + TODAY() + ".md", toMarkdown(), "text/markdown"); break;
+      case "showDump": state.dump = { name: "pda-backup-" + TODAY() + ".json", text: JSON.stringify(db, null, 2) }; render(); break;
+      case "closeDump": state.dump = null; render(); break;
+      case "pickImport": $("#jsonFile").click(); break;
+      case "wipe":
+        if (confirm("這會清除全部資料，確定？\n（會先自動備份一份，可在「自動備份」還原）" + (sync.token ? "\n\n已開啟雲端同步：其他裝置同步後也會一起清空。" : "")) && confirm("真的確定？")) {
+          if (!snapshot("清除前") && !confirm("自動備份失敗。仍要清除嗎？")) break;
+          db = seed(); save(true); state.memoSel = null; render();
+        }
+        break;
+      case "snapRestore": {
+        const sn = loadSnaps()[+el.dataset.i];
+        if (!sn) break;
+        if (!confirm(`還原到 ${new Date(sn.at).toLocaleString("zh-TW")}（${sn.reason}）的資料？\n目前的資料也會先自動備份。`)) break;
+        try {
+          const d = normalize(JSON.parse(sn.data));
+          snapshot("還原前");
+          db = d; save(true); state.memoSel = null; render(); say("已還原備份。");
+        } catch (e) { alert("還原失敗：" + e.message); }
+        break;
+      }
+      case "snapDownload": {
+        const sn = loadSnaps()[+el.dataset.i];
+        if (sn) download(`pda-${sn.reason}備份-${iso(new Date(sn.at))}.json`, sn.data, "application/json");
+        break;
+      }
+    }
+    if (el.dataset.go) go(el.dataset.go);
+  };
+
+  // 備忘錄即時編輯
+  const mt = $("#memoTitle"), mb = $("#memoBody");
+  if (mt && mb) {
+    const upd = () => {
+      const m = db.memos.find(x => x.id === state.memoSel);
+      if (!m) return;
+      m.title = mt.value; m.body = mb.value; m.updated = Date.now();
+      const sel = $(`.list .item.sel .title`);
+      if (sel) sel.textContent = m.title || "（無標題）";
+      const meta = $("#memoMeta");
+      if (meta) meta.innerHTML = memoMetaHtml(m);
+      const cnt = $("#memoCount");
+      if (cnt) cnt.textContent = charCount(m.body);
+      save();
+    };
+    mt.oninput = upd; mb.oninput = upd;
+    mb.onkeydown = mdKeydown;
+  }
+
+  // 技能筆記與簡介
+  const sn = $("#skNote");
+  if (sn) sn.oninput = () => { const s = skById(state.skSel); if (s) { s.note = sn.value; save(); } };
+  const sd = $("#skDesc");
+  if (sd) sd.oninput = () => {
+    const s = skById(state.skSel);
+    if (!s) return;
+    s.desc = sd.value; s.descV = 2;
+    const box = document.querySelector(".sk-desc");
+    if (box) box.textContent = s.desc;
+    save();
+  };
+
+  // 搜尋框
+  const mq = $("#memoQ");
+  // 注音等輸入法組字中不重畫（重畫會換掉輸入框、打斷組字），選完字的 compositionend 再重畫
+  const live = (n, key, sel) => {
+    const apply = () => { state[key] = n.value; state.focus = sel; render(); };
+    n.oninput = e => { if (!e.isComposing) apply(); };
+    n.addEventListener("compositionend", apply);   // 沒有 oncompositionend 屬性，只能用 addEventListener
+  };
+  if (mq) live(mq, "memoQ", "#memoQ");
+  const lq = $("#linkQ");
+  if (lq) live(lq, "linkQ", "#linkQ");
+
+  // Enter 送出
+  const enter = (sel, act) => {
+    const n = $(sel);
+    if (n) n.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); v.querySelector(`[data-act="${act}"]`)?.click(); } };
+  };
+  enter("#quickTodo", "quickAdd");
+  enter("#todoText", "addTodo");
+  enter("#evTitle", "addEvent");
+  enter("#lkUrl", "addLink");
+  enter("#lkTitle", "addLink");
+  enter("#geoQ", "geoGo");
+  enter("#syncToken", "syncOn");
+
+  // 檔案匯入
+  const bm = $("#bmFile");
+  if (bm) bm.onchange = () => {
+    const f = bm.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      const doc = new DOMParser().parseFromString(r.result, "text/html");
+      const as = [...doc.querySelectorAll("a[href]")];
+      let n = 0;
+      as.forEach(a => {
+        const url = a.getAttribute("href");
+        if (!/^https?:/i.test(url)) return;
+        if (db.links.some(l => l.url === url)) return;
+        // 書籤所在的資料夾名稱當分類（<DT><H3>資料夾</H3><DL>…），沒有資料夾就歸到「匯入」
+        const cat = a.closest("dl")?.parentElement?.querySelector(":scope > h3")?.textContent.trim() || "匯入";
+        db.links.unshift({ id: uid(), title: a.textContent.trim() || url, url, cat, tags: [], read: false });
+        n++;
+      });
+      save(true); render();
+      alert(`匯入完成，新增 ${n} 筆（已跳過 ${as.length - n} 筆重複或非網址）。`);
+    };
+    r.readAsText(f, "utf-8");
+  };
+
+  const jf = $("#jsonFile");
+  if (jf) jf.onchange = () => {
+    const f = jf.files[0]; jf.value = ""; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(r.result);
+        if (!d || typeof d !== "object") throw new Error("格式不對");
+        if (!confirm("匯入會覆蓋目前所有資料，確定？\n（會先自動備份目前的資料，匯錯了可以到「設定 → 資料 → 自動備份」還原）")) return;
+        if (!snapshot("匯入前") && !confirm("自動備份失敗。仍要繼續匯入嗎？建議先按「匯出 JSON」手動備份。")) return;
+        db = normalize(d);
+        save(true); state.memoSel = null; render();
+        alert("匯入完成。原本的資料已自動備份，可在「設定 → 資料 → 自動備份」還原。");
+      } catch (e) { alert("匯入失敗：" + e.message); }
+    };
+    r.readAsText(f, "utf-8");
+  };
+}
+
+/* ================= 匯出 ================= */
+function download(name, text, mime) {
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: mime + ";charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.style.display = "none";
+    document.body.appendChild(a);   // 必須掛進 DOM，否則部分瀏覽器會忽略這次 click
+    a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 2000);
+    say(`已匯出 ${name}，請看瀏覽器的下載項目。`);
+  } catch (e) {
+    // 下載被擋掉時的退路：把內容顯示出來讓使用者自己複製
+    state.dump = { name, text };
+    render();
+  }
+}
+
+function toMarkdown() {
+  const L = [`# PDA 匯出 · ${TODAY()}`, ""];
+  L.push("## 待辦", "");
+  db.todos.forEach(t => L.push(`- [${t.done ? "x" : " "}] ${t.text}${t.due ? ` （${t.due}）` : ""}`));
+  L.push("", "## 行事曆", "");
+  [...db.events].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+    .forEach(e => L.push(`- ${e.skill ? `[${e.done ? "x" : " "}] ` : ""}${e.date} ${e.time || ""} ${e.title}${e.skill ? `（⚔ +${e.xp || 25}XP）` : ""}`));
+  L.push("", "## 分頁收藏", "");
+  db.links.forEach(l => L.push(`- [${l.title}](${l.url})${l.cat ? ` \`${l.cat}\`` : ""}`));
+  L.push("", "## 技能樹", "");
+  [...db.skills].sort((a, b) => a.cat.localeCompare(b.cat) || a.tier - b.tier).forEach(s =>
+    L.push(`- [${s.lv >= s.maxLv ? "x" : " "}] ${s.cat}／${s.name} — Lv.${s.lv}/${s.maxLv}${s.note ? `（${s.note.replace(/\n/g, " ")}）` : ""}`));
+  L.push("", "## 知識庫", "");
+  db.memos.filter(m => m.kb).forEach(m => L.push(`### ${m.title || "（無標題）"}`, "", m.body, ""));
+  L.push("", "## 備忘錄", "");
+  db.memos.filter(m => !m.kb).forEach(m => L.push(`### ${m.title || "（無標題）"}`, "", m.body, ""));
+  return L.join("\n");
+}
+
+/* ================= 啟動 ================= */
+document.addEventListener("keydown", e => {
+  if (e.altKey && e.key >= "1" && e.key <= String(MODULES.length)) {
+    e.preventDefault();
+    go(MODULES[+e.key - 1].id);
+  }
+});
+
+setInterval(() => {
+  const d = new Date();
+  $("#clock").textContent = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}, 1000);
+
+/* 開機序列：逐行打字，點一下或按任意鍵可略過 */
+function boot() {
+  const box = document.getElementById("boot");
+  if (!box || !db.settings.boot) return;
+  const kb = (new Blob([JSON.stringify(db)]).size / 1024).toFixed(1);
+  const lines = [
+    "PERSONAL DIGITAL ASSISTANT",
+    "パーソナル・デジタル・アシスタント",
+    "",
+    "BOOT SEQUENCE ............ START",
+    "MEMORY CHECK ............. OK",
+    `LOCAL STORAGE ............ OK  (${kb} KB)`,
+    `MODULES LOADED ........... ${MODULES.length}`,
+    `RECORDS .................. ${db.memos.length + db.todos.length + db.events.length + db.links.length}`,
+    "NAVI ..................... ONLINE",
+    "",
+    "SYSTEM READY."
+  ];
+  box.classList.remove("off");
+  box.textContent = "";
+  let i = 0;
+  const t = setInterval(() => {
+    box.textContent += lines[i++] + "\n";
+    if (i >= lines.length) { clearInterval(t); setTimeout(done, 420); }
+  }, 95);
+  function done() { clearInterval(t); box.classList.add("off"); }
+  box.onclick = done;
+  document.addEventListener("keydown", done, { once: true });
+}
+
+render();
+boot();
+showSync();
+syncNow();
+fetchWeather();
+setInterval(() => fetchWeather(), 30 * 60 * 1000);
+// 放在 https 網址（GitHub Pages）時註冊離線快取；本機 file:// 不需要
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
