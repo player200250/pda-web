@@ -580,7 +580,7 @@ function seed() {
     memos: [{
       id: uid(),
       title: "歡迎使用 PDA",
-      body: "這是你自己的個人助理，資料只存在這台電腦。\n\n幾件事先知道：\n\n1. 所有資料存在瀏覽器的 localStorage，不會上傳任何地方。\n2. 「設定」裡有匯出 JSON，養成偶爾備份的習慣——清瀏覽器資料會把這裡清掉。\n3. 「設定 → 雲端同步」貼上 GitHub Token，手機和電腦就能同步。\n4. 想改樣子或加功能，直接用編輯器打開 pda.html 改，沒有建置流程。\n\nAlt+1 到 Alt+8 可以切換模組。",
+      body: "這是你自己的個人助理，資料只存在這台電腦。\n\n幾件事先知道：\n\n1. 所有資料存在瀏覽器的 localStorage，不會上傳任何地方。\n2. 「設定」裡有匯出 JSON，養成偶爾備份的習慣——清瀏覽器資料會把這裡清掉。\n3. 「設定 → 雲端同步」貼上 GitHub Token，手機和電腦就能同步。\n4. 想改樣子或加功能，直接用編輯器打開 pda.html 改，沒有建置流程。\n\nAlt+1 到 Alt+9 可以切換模組。",
       updated: Date.now()
     }],
     todos: [],
@@ -621,7 +621,7 @@ let state = {
 
 // 補齊缺漏欄位，避免舊資料造成錯誤（讀取與匯入共用）
 function normalize(d) {
-  d.memos ||= []; d.todos ||= []; d.events ||= []; d.links ||= [];
+  d.memos ||= []; d.todos ||= []; d.events ||= []; d.links ||= []; d.fixes ||= [];
   for (let v = (d.schema || 1) + 1; v <= SCHEMA; v++) if (MIGRATIONS[v]) MIGRATIONS[v](d);
   d.schema = SCHEMA;
   d.memos.forEach(m => { m.kb = !!m.kb; });
@@ -871,6 +871,7 @@ const MODULES = [
   { id: "cal",   name: "行事曆",   ic: "▦" },
   { id: "skill", name: "技能樹",   ic: "⚔" },
   { id: "link",  name: "分頁收藏", ic: "★" },
+  { id: "spine", name: "Spine 計畫", ic: "✦" },
   { id: "set",   name: "設定",     ic: "⚙" }
 ];
 
@@ -902,7 +903,7 @@ function render() {
   document.getElementById("app").dataset.theme = db.settings.theme || "green";
   renderTabs();
   const v = $("#view");
-  v.innerHTML = ({ home: viewHome, memo: viewMemo, kb: viewMemo, todo: viewTodo, cal: viewCal, skill: viewSkill, link: viewLink, set: viewSet })[state.view]();
+  v.innerHTML = ({ home: viewHome, memo: viewMemo, kb: viewMemo, todo: viewTodo, cal: viewCal, skill: viewSkill, link: viewLink, spine: viewSpine, set: viewSet })[state.view]();
   wire();
   updateChara();
   renderWx();
@@ -2065,6 +2066,142 @@ function viewLink() {
     <input type="file" id="bmFile" accept=".html,.htm" style="display:none">`;
 }
 
+/* ================= Spine 計畫 ================= */
+// 13 週 Spine 作品集行程（W1 從 2026-11-02 週一開始）。每日／每週提醒由 Claude 排程任務推播，內容與此表一致
+const SPINE_START = "2026-11-02";
+const SPINE_WEEKS = [
+  ["狐耳巫女", "看官方使用者指南影片", "拆解 Spineboy、改自己的 idle", "能說出 Setup/Animate 差異、改動 idle"],
+  ["狐耳巫女", "狐耳巫女拆件、補圖", "存 PSD 匯入 Spine", "所有部件匯入且位置正確"],
+  ["狐耳巫女", "狐耳巫女骨架、Mesh、權重", "呼吸＋眨眼循環", "5 秒無縫循環"],
+  ["狐耳巫女", "耳朵、頭髮、鈴鐺 Physics", "逐格小特效＋匯出", "★ 作品一完成"],
+  ["女僕", "女僕分層、補圖", "彈跳球逐格＋女僕匯入", "女僕匯入 Spine"],
+  ["女僕", "女僕骨架、Mesh", "女僕 Physics（馬尾／裙襬／綁帶）", "擺動自然不穿幫"],
+  ["女僕", "走路循環逐格練習", "女僕立繪動態完成並匯出", "★ 作品二完成"],
+  ["紅披風女孩", "紅披風女孩重畫中性站姿", "拆件、補圖、匯入", "匯入 Spine"],
+  ["紅披風女孩", "骨架與腳 IK", "idle、walk 循環", "兩個循環動作"],
+  ["紅披風女孩", "run、attack", "手繪刀光逐格特效", "攻擊含特效"],
+  ["紅披風女孩", "hit、death", "Unity 匯入，全套動作播放", "★ 作品三完成，在 Unity 播放"],
+  ["作品集", "剪 Demo reel（強作品放前 10 秒）", "Breakdown＋上傳 ArtStation／YouTube／Vimeo", "★ 作品集上線"],
+  ["求職", "寫履歷", "計時試作練習（待機＋攻擊）", "投遞清單備妥"]
+];
+const SPINE_MILES = [
+  ["2026-11-29", "作品一：狐耳巫女"],
+  ["2026-12-20", "作品二：女僕"],
+  ["2027-01-17", "作品三：紅披風女孩（Unity 播放）"],
+  ["2027-01-24", "作品集上線"],
+  ["2027-02-01", "開始投遞"]
+];
+// 個別日期的調整，優先於固定節奏
+const SPINE_OVERRIDE = {
+  "2026-11-10": ["20:00", "補練：Spineboy 精簡版 2 小時", "看懂骨架父子關係、Slot/Attachment 對應、idle 關鍵影格；有餘力再改 idle"],
+  "2027-01-01": ["", "元旦休息", ""]
+};
+const SPINE_LOG0 = "W1（11/2–11/8）：官方使用者指南影片已看完 ✓。Spineboy 拆解＋改 idle 未完成。\n11/10（週二）：補練日 20:00，2 小時 Spineboy 精簡版。\n11/15 回顧：確認 Spineboy 補練是否完成；仍未完成就併入 W3 呼吸眨眼一起練，不再額外補。\n";
+
+function spineDayIdx(d) {   // 從 W1 週一起算第幾天（0 起）
+  const a = new Date(SPINE_START + "T00:00:00"), b = new Date(d + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
+function spineAddDays(n) {
+  const d = new Date(SPINE_START + "T00:00:00"); d.setDate(d.getDate() + n); return iso(d);
+}
+// 回傳某天要做的事：{ w, kind, time, what, tip }
+function spineToday(d) {
+  const i = spineDayIdx(d), w = Math.floor(i / 7);
+  if (i < 0) return { w: -1, kind: "before", what: "行程尚未開始" };
+  if (w >= SPINE_WEEKS.length) return { w, kind: "after", what: "13 週行程已完成，開始投遞！" };
+  const o = SPINE_OVERRIDE[d];
+  if (o) return { w, kind: o[0] ? "train" : "rest", time: o[0], what: o[1], tip: o[2] };
+  const dow = new Date(d + "T00:00:00").getDay(), W = SPINE_WEEKS[w];
+  if (dow === 1 || dow === 3 || dow === 5) return { w, kind: "train", time: "20:00", what: W[1], tip: "練 2 小時" };
+  if (dow === 6) return { w, kind: "train", time: "13:00", what: W[2], tip: "練 6–8 小時" };
+  if (dow === 0) return { w, kind: "review", time: "21:00", what: "每週回顧 15 分鐘", tip: "對照本週完成標準：" + W[3] };
+  return { w, kind: "rest", what: "休息日", tip: "這週還要做：" + W[1] + "／" + W[2] };
+}
+
+function viewSpine() {
+  const t = TODAY(), cur = spineToday(t);
+  const cw = Math.min(Math.max(cur.w, 0), SPINE_WEEKS.length - 1);
+  const next = SPINE_MILES.find(m => m[0] >= t);
+  const nextDays = next ? daysFromToday(next[0]) : null;
+  const pct = Math.min(100, Math.max(0, Math.round(spineDayIdx(t) / (SPINE_WEEKS.length * 7) * 100)));
+  const KIND = { train: "練習日", rest: "休息", review: "回顧", before: "未開始", after: "完成" };
+
+  return `
+    <h2>Spine 計畫</h2>
+    <div class="sub-line">13 週作品集行程 ・ 2026-11-02 → 2027-02-01 開始投遞</div>
+
+    <div class="grid c3" style="margin-bottom:14px">
+      <div class="stat ok"><div class="k">目前進度</div><div class="v">${cur.w < 0 ? "—" : cur.w >= SPINE_WEEKS.length ? "完成" : "W" + (cur.w + 1)}</div>
+        <div class="n">${cur.w >= 0 && cur.w < SPINE_WEEKS.length ? esc(SPINE_WEEKS[cw][0]) + "・總進度 " + pct + "%" : ""}</div></div>
+      <div class="stat"><div class="k">下一個 ★ 里程碑</div><div class="v">${next ? (nextDays === 0 ? "今天" : nextDays + " 天") : "—"}</div>
+        <div class="n">${next ? esc(next[1]) + "（" + fmtDate(next[0]) + "）" : "全部達成"}</div></div>
+      <div class="stat"><div class="k">今天</div><div class="v" style="font-size:20px">${KIND[cur.kind]}${cur.time ? " " + cur.time : ""}</div>
+        <div class="n">${esc(cur.what)}</div></div>
+    </div>
+    <div class="bar" style="margin-bottom:16px"><i style="width:${pct}%"></i></div>
+
+    <div class="grid c2" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-h"><span class="t">今天要做什麼</span></div>
+        <div class="title" style="font-weight:600; margin-bottom:6px">${esc(cur.what)}</div>
+        ${cur.tip ? `<div class="muted">${esc(cur.tip)}</div>` : ""}
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="t">W${cw + 1} 本週（${fmtDate(spineAddDays(cw * 7))}–${fmtDate(spineAddDays(cw * 7 + 6))}）</span></div>
+        <div class="muted">平日（一三五 20:00）：${esc(SPINE_WEEKS[cw][1])}</div>
+        <div class="muted">週六（13:00）：${esc(SPINE_WEEKS[cw][2])}</div>
+        <div style="margin-top:6px">完成標準：<b>${esc(SPINE_WEEKS[cw][3])}</b></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-h"><span class="t">13 週行程</span></div>
+      <div style="overflow-x:auto">
+      <table style="width:100%; border-collapse:collapse; font-size:12.5px; min-width:560px">
+        <tr style="color:var(--dim); text-align:left"><th style="padding:6px">週</th><th>日期</th><th>平日（一三五）</th><th>週六</th><th>完成標準</th></tr>
+        ${SPINE_WEEKS.map((w, i) => {
+          const on = i === cur.w, past = cur.w > i;
+          return `<tr style="border-top:1px solid var(--line);${on ? "background:var(--chip);color:var(--accent);" : ""}${past ? "opacity:.55;" : ""}">
+            <td style="padding:7px 6px; white-space:nowrap">W${i + 1}${on ? " ◀" : ""}</td>
+            <td style="white-space:nowrap">${spineAddDays(i * 7).slice(5).replace("-", "/").replace(/^0|\/0/g, m => m.replace("0", ""))}–${spineAddDays(i * 7 + 6).slice(5).replace("-", "/").replace(/^0|\/0/g, m => m.replace("0", ""))}</td>
+            <td>${esc(w[1])}</td><td>${esc(w[2])}</td><td>${esc(w[3])}</td></tr>`;
+        }).join("")}
+      </table>
+      </div>
+    </div>
+
+    <div class="grid c2" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-h"><span class="t">★ 里程碑</span></div>
+        ${SPINE_MILES.map(m => {
+          const d = daysFromToday(m[0]);
+          return `<div class="item ${d < 0 ? "done" : ""}"><div class="body">
+            <div class="title">${esc(m[1])}</div><div class="sub">${fmtDate(m[0])}</div></div>
+            <span class="muted" style="white-space:nowrap">${d < 0 ? "已過" : d === 0 ? "今天" : "還有 " + d + " 天"}</span></div>`;
+        }).join("")}
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="t">節奏與提醒</span></div>
+        <div class="muted" style="line-height:1.9">
+          週一、三、五 20:00 練 2 小時<br>
+          週六 13:00 練 6–8 小時<br>
+          週二、四休息（必要時當補練日）<br>
+          週日 21:00 每週回顧 15 分鐘<br>
+          <span style="color:var(--fg)">手機推播：</span>每日訓練提醒 20:10、每週進度回顧 週日 19:47
+        </div>
+        <div style="margin-top:10px; border-top:1px solid var(--line); padding-top:9px" class="muted">
+          <b style="color:var(--fg)">落後時：</b>能補的排到下週二或週四；補不了就縮小範圍；整體最多延後一週。落後只是紀錄，不用自責。
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="t">進度紀錄</span><span class="muted">自動儲存・會跟著雲端同步</span></div>
+      <textarea id="spineLog" rows="7" style="width:100%" placeholder="今天練到哪、卡在哪、哪些要補…">${esc(typeof db.settings.spineLog === "string" ? db.settings.spineLog : SPINE_LOG0)}</textarea>
+    </div>`;
+}
+
 /* ================= 設定 ================= */
 function viewSet() {
   const bytes = new Blob([JSON.stringify(db)]).size;
@@ -2290,7 +2427,7 @@ function viewSet() {
         <div class="set-note" style="margin-top:0">
           單檔 HTML，沒有相依套件、沒有建置流程。只連天氣服務，以及開啟雲端同步時的 GitHub。
           要改功能或外觀，用編輯器打開 <code>pda.html</code> 直接改。
-          <br>Alt+1 ~ Alt+8 切換模組。資料存在瀏覽器 localStorage。
+          <br>Alt+1 ~ Alt+9 切換模組。資料存在瀏覽器 localStorage。
         </div>
       </div>
 
@@ -2573,6 +2710,10 @@ function wire() {
     mb.onkeydown = mdKeydown;
   }
 
+  // Spine 計畫的進度紀錄
+  const sl = $("#spineLog");
+  if (sl) sl.oninput = () => { db.settings.spineLog = sl.value; save(); };
+
   // 技能筆記與簡介
   const sn = $("#skNote");
   if (sn) sn.oninput = () => { const s = skById(state.skSel); if (s) { s.note = sn.value; save(); } };
@@ -2735,10 +2876,41 @@ function boot() {
   document.addEventListener("keydown", done, { once: true });
 }
 
+// 一次性進度修正（標記存在資料裡，只會套用一次；用日期＋標題比對，不依賴 id）
+// 2026-11-08 Spine W1：指南影片已看完；Spineboy 實戰沒做到，移到 11/10 週二補 2 小時精簡版
+function applySpineFixW1() {
+  db.fixes ||= [];
+  if (db.fixes.includes("spineW1")) return false;
+  const find = (date, kw) => db.events.find(e => e.date === date && (e.title || "").includes(kw));
+  const msgs = [];
+  ["2026-11-02", "2026-11-04", "2026-11-06"].forEach(d => {
+    const e = find(d, "指南影片");
+    if (e && !e.done) { e.done = true; const m = syncEventXp(e); if (m) msgs.push(m); }
+  });
+  const sb = find("2026-11-07", "Spineboy") || find("2026-11-10", "Spineboy");
+  if (sb && !sb.done) {
+    sb.date = "2026-11-10"; sb.time = "20:00"; sb.xp = 25;
+    sb.title = "訓練：Spine 基本｜W1 補練 Spineboy 精簡版";
+    sb.note = "2 小時。看懂骨架父子關係、Slot/Attachment 對應、idle 的關鍵影格；有餘力再改 idle，首尾要接得起來";
+  }
+  const rv = find("2026-11-15", "每週回顧");
+  if (rv && !(rv.note || "").includes("Spineboy")) {
+    rv.note = (rv.note ? rv.note + "。" : "") + "確認 Spineboy 補練是否完成；沒完成就併入 W3 呼吸眨眼一起練，不再額外補";
+  }
+  db.fixes.push("spineW1");
+  return true;
+}
+function runFixes() {
+  try {
+    if (applySpineFixW1()) { save(true); render(); say("已更新 Spine 行事曆：W1 影片標記完成，Spineboy 移到 11/10（二）20:00 補練。"); }
+  } catch (e) { console.warn("進度修正失敗", e); }
+}
+
 render();
 boot();
 showSync();
-syncNow();
+// 先等雲端同步拉完最新資料再修正，免得改到舊資料
+Promise.resolve(syncNow()).catch(() => {}).then(runFixes);
 fetchWeather();
 setInterval(() => fetchWeather(), 30 * 60 * 1000);
 // 放在 https 網址（GitHub Pages）時註冊離線快取；本機 file:// 不需要
