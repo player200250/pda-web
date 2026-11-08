@@ -2759,9 +2759,51 @@ function applySpineFixW1() {
   db.fixes.push("spineW1");
   return true;
 }
+// 2026-11-08 W1 每週回顧備忘（固定 id，兩台裝置都加也只會有一則）
+function addSpineReviewW1() {
+  db.fixes ||= [];
+  if (db.fixes.includes("reviewW1")) return false;
+  const id = "spine-review-w1";
+  if (!db.memos.some(m => m.id === id)) db.memos.unshift({
+    id, kb: false, updated: Date.now(),
+    title: "Spine W1 每週回顧（11/2–11/8）",
+    body: [
+      "## 完成標準",
+      "- ✅ 能說出 Setup／Animate 模式的差異",
+      "- ✅ 官方使用者指南影片看完（11/2、11/4、11/6）",
+      "- ⏸ 拆解 Spineboy、改自己的 idle → 延到 11/10（二）20:00 補練",
+      "",
+      "## 結論",
+      "完成 2/3，節奏 OK。沒做到的原因是時間不夠，不是卡關，不用縮減範圍，週二補回來就好。",
+      "",
+      "## 調整",
+      "週六一次排 6–8 小時，那天有事整週實作就沒了。之後週六沒空時先做「最低版本」（例如 Spineboy 只看懂骨架、不改 idle），不要整項延後。",
+      "",
+      "## W2 安排（11/9–11/15）",
+      "- 11/9（一）20:00　狐耳巫女拆件、補圖",
+      "- 11/10（二）20:00　補練 Spineboy 精簡版 2 小時",
+      "- 11/11（三）20:00　狐耳巫女拆件、補圖",
+      "- 11/13（五）20:00　狐耳巫女拆件、補圖",
+      "- 11/14（六）13:00　存 PSD、匯入 Spine",
+      "- 11/15（日）21:00　每週回顧（確認 Spineboy 補了沒）",
+      "",
+      "W2 完成標準：狐耳巫女所有部件匯入 Spine 且位置正確。",
+      "拆件提醒：關節處被遮住的部分要多畫一截，轉動才不會露出缺口。",
+      "",
+      "下一個 ★：11/29 作品一（狐耳巫女）",
+      "",
+      "#Spine #每週回顧"
+    ].join("\n")
+  });
+  db.fixes.push("reviewW1");
+  return true;
+}
 function runFixes() {
   try {
-    if (applySpineFixW1()) { save(true); render(); say("已更新 Spine 行事曆：W1 影片標記完成，Spineboy 移到 11/10（二）20:00 補練。"); }
+    const a = applySpineFixW1(), b = addSpineReviewW1();
+    if (a || b) save(true), render();
+    if (a) say("已更新 Spine 行事曆：W1 影片標記完成，Spineboy 移到 11/10（二）20:00 補練。");
+    else if (b) say("已新增備忘：Spine W1 每週回顧。");
   } catch (e) { console.warn("進度修正失敗", e); }
 }
 
